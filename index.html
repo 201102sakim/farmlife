@@ -7,805 +7,805 @@
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
 <style>
-• {
-box-sizing: border-box;
-margin: 0;
-padding: 0;
-user-select: none;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
 }
 body {
-background-color: #121212;
-display: flex;
-justify-content: center;
-align-items: center;
-min-height: 100vh;
-font-family: monospace;
-overflow: hidden;
+  background-color: #121212;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: monospace;
+  overflow: hidden;
 }
 #game-container {
-position: relative;
-width: 480px;
-height: 720px;
-box-shadow: 0 0 25px rgba(0,0,0,0.9);
-border: 6px solid #2d1810;
-background: #83b869;
+  position: relative;
+  width: 480px;
+  height: 720px;
+  box-shadow: 0 0 25px rgba(0,0,0,0.9);
+  border: 6px solid #2d1810;
+  background: #83b869;
 }
 canvas {
-display: block;
-width: 100%;
-height: 100%;
-image-rendering: pixelated;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
 }
 </style>
 </head>
 <body>
 
 <div id="game-container">
-<canvas id="gameCanvas" width="480" height="720"></canvas>
+  <canvas id="gameCanvas" width="480" height="720"></canvas>
 </div>
 
 <script>
 window.addEventListener('DOMContentLoaded', function() {
-const canvas = document.getElementById('gameCanvas');
-if (!canvas) return;
-const ctx = canvas.getContext('2d');
-if (!ctx) return;
-
-ctx.imageSmoothingEnabled = false;
-
-const titleImage = new Image();
-titleImage.src = '타이틀.jpg';
-
-const charImages = {
-SOUTH: new Image(),
-NORTH: new Image(),
-EAST: new Image(),
-WEST: new Image()
-};
-charImages.SOUTH.src = 'south.png';
-charImages.NORTH.src = 'north.png';
-charImages.EAST.src = 'east.png';
-charImages.WEST.src = 'west.png';
-
-const uiImages = {
-dateTime: new Image(),
-inventory: new Image(),
-season: new Image(),
-bagGrid: new Image(),
-noticeIcon: new Image()
-};
-uiImages.dateTime.src = 'ui_datetime.png';
-uiImages.inventory.src = 'ui_inventory.png';
-uiImages.season.src = 'ui_season.png';
-uiImages.bagGrid.src = 'ui_bag_grid.png';
-uiImages.noticeIcon.src = 'icon_notice.png';
-
-const itemImages = {
-rake: new Image(),
-can: new Image(),
-potato_seed: new Image(),
-potato: new Image()
-};
-itemImages.rake.src = 'item_rake.png';
-itemImages.can.src = 'item_can.png';
-itemImages.potato_seed.src = 'item_potato_seed.png';
-itemImages.potato.src = 'item_potato.png';
-
-const cropImages = {
-potato: [
-new Image(),
-new Image(),
-new Image()
- ]
-};
-cropImages.potato[0].src = 'crop_potato_stage1.png';
-cropImages.potato[1].src = 'crop_potato_stage2.png';
-cropImages.potato[2].src = 'crop_potato_stage3.png';
-
-const bgImages = {
-MORNING_HOUSE: new Image(),
-MORNING_FARM: new Image(),
-EVENING_HOUSE: new Image(),
-EVENING_FARM: new Image(),
-NIGHT_HOUSE: new Image(),
-NIGHT_FARM: new Image(),
-DAWN_HOUSE: new Image(),
-DAWN_FARM: new Image()
-};
-
-bgImages.MORNING_HOUSE.src = 'house_morning.png';
-bgImages.MORNING_FARM.src = 'farm_morning.png';
-bgImages.EVENING_HOUSE.src = 'house_evening.png';
-bgImages.EVENING_FARM.src = 'farm_evening.png';
-bgImages.NIGHT_HOUSE.src = 'house_night.png';
-bgImages.NIGHT_FARM.src = 'farm_night.png';
-bgImages.DAWN_HOUSE.src = 'house_dawn.png';
-bgImages.DAWN_FARM.src = 'farm_dawn.png';
-
-let gameState = 'TITLE';
-let fadeAlpha = 0;
-let fadeState = 'NONE';
-let pendingSceneChange = null;
-let toastMessage = '';
-let toastTimer = 0;
-
-const INTERACTION_DISTANCE = 80;
-
-const SEASONS = ['봄', '여름', '가을', '겨울'];
-let currentSeasonIdx = 0;
-let currentDay = 1;
-let gameTime = 6 * 60;
-
-let selectedHotbarSlot = 0;
-let isBagOpen = false;
-let mailboxHasSeed = true;
-
-const hotbar = [
-{ type: 'tool', id: 'rake', name: '갈퀴', count: 1 },
-{ type: 'tool', id: 'can', name: '물뿌리개', count: 1 },
-{ type: 'seed', id: 'potato_seed', name: '감자 씨앗', cropId: 'potato', count: 6 },
-null
- ];
-const bagInventory = new Array(30).fill(null);
-
-const player = {
-x: 240,
-y: 360,
-targetX: 240,
-targetY: 360,
-speed: 3.5,
-direction: 'SOUTH',
-isSleeping: false
-};
-
-const FARM_COLS = 6;
-const FARM_ROWS = 10;
-const farmOffsetX = 50;
-const farmOffsetY = 260;
-const tileW = 43.3;
-const tileH = 41.5;
-
-const farmTiles = Array.from({ length: FARM_ROWS * FARM_COLS }, function() {
-return {
-tilled: false,
-watered: false,
-crop: null
-};
-});
-
-const CROP_DATA = {
-potato: { name: '감자', seasons: ['봄'], growthDays: 3, minYield: 2, maxYield: 4 }
-};
-
-const titleButtons = [
-{ id: 'start', x: 130, y: 320, w: 180, h: 65 },
-{ id: 'option', x: 130, y: 410, w: 180, h: 65 },
-{ id: 'exit', x: 130, y: 500, w: 180, h: 65 }
- ];
-
-function checkCollision(x, y, scene) {
-const pRadius = 8;
-const pBox = {
-left: x - pRadius,
-right: x + pRadius,
-top: y - 4,
-bottom: y + pRadius
-};
-
-let obstacles = [];
-
-if (scene === 'FARM') {
-obstacles = [
-{ x: 0, y: 0, w: 260, h: 140 },
-{ x: 0, y: 140, w: 25, h: 540 },
-{ x: 0, y: 680, w: 480, h: 40 },
-{ x: 260, y: 0, w: 220, h: 260 },
-{ x: 210, y: 135, w: 50, h: 85 },
-{ x: 460, y: 220, w: 20, h: 200 }
- ];
-} else if (scene === 'HOUSE') {
-obstacles = [
-{ x: 0, y: 0, w: 480, h: 300 },
-{ x: 0, y: 0, w: 65, h: 720 },
-{ x: 435, y: 0, w: 45, h: 720 },
-{ x: 0, y: 600, w: 140, h: 120 },
-{ x: 220, y: 600, w: 260, h: 120 },
-{ x: 95, y: 280, w: 95, h: 130 },
-{ x: 115, y: 430, w: 45, h: 60 },
-{ x: 325, y: 230, w: 110, h: 210 }
- ];
-}
-
-for (let i = 0; i < obstacles.length; i++) {
-const obs = obstacles[i];
-if (pBox.right > obs.x && pBox.left < obs.x + obs.w &&
-pBox.bottom > obs.y && pBox.top < obs.y + obs.h) {
-return true;
-}
-}
-return false;
-}
-
-function getDistance(x1, y1, x2, y2) {
-return Math.hypot(x2 - x1, y2 - y1);
-}
-
-function showToast(msg) {
-toastMessage = msg;
-toastTimer = 2.0;
-}
-
-function updatePlayerDirection(targetX, targetY) {
-const dx = targetX - player.x;
-const dy = targetY - player.y;
-
-if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
-
-if (Math.abs(dx) > Math.abs(dy)) {
-player.direction = dx > 0 ? 'EAST' : 'WEST';
-} else {
-player.direction = dy > 0 ? 'SOUTH' : 'NORTH';
-}
-}
-
-function getTimePeriod(timeInMinutes) {
-const hour = Math.floor(timeInMinutes / 60) % 24;
-if (hour >= 6 && hour < 18) return 'MORNING';
-if (hour >= 18 && hour < 21) return 'EVENING';
-if (hour >= 21 || hour < 4) return 'NIGHT';
-return 'DAWN';
-}
-
-function formatGameTime(timeInMinutes) {
-const totalMin = Math.floor(timeInMinutes) % (24 * 60);
-const hours = Math.floor(totalMin / 60);
-const mins = totalMin % 60;
-const period = hours >= 12 ? 'PM' : 'AM';
-const displayHour = hours % 12 === 0 ? 12 : hours % 12;
-const displayMin = String(mins).padStart(2, '0');
-return displayHour + ':' + displayMin + ' ' + period;
-}
-
-let lastTime = performance.now();
-function gameLoop() {
-const now = performance.now();
-const dt = Math.min((now - lastTime) / 1000, 0.1);
-lastTime = now;
-
-update(dt);
-render();
-
-requestAnimationFrame(gameLoop);
-}
-
-function update(dt) {
-if (toastTimer > 0) toastTimer -= dt;
-
-if (fadeState === 'OUT') {
-fadeAlpha += dt * 2.5;
-if (fadeAlpha >= 1) {
-fadeAlpha = 1;
-if (pendingSceneChange) {
-pendingSceneChange();
-pendingSceneChange = null;
-}
-fadeState = 'IN';
-}
-} else if (fadeState === 'IN') {
-fadeAlpha -= dt * 2.5;
-if (fadeAlpha <= 0) {
-fadeAlpha = 0;
-fadeState = 'NONE';
-}
-}
-
-if (gameState === 'TITLE') return;
-
-if (!player.isSleeping) {
-const hour = Math.floor(gameTime / 60) % 24;
-let timeSpeed = 1;
-
-if (hour >= 6 && hour < 18) {
-timeSpeed = 720 / 360;
-} else if (hour >= 18 && hour < 21) {
-timeSpeed = 180 / 180;
-} else if (hour >= 21 || hour < 4) {
-timeSpeed = 420 / 180;
-} else {
-timeSpeed = 120 / 180;
-}
-
-gameTime += dt * timeSpeed;
-
-if (gameTime >= 24 * 60) {
-gameTime -= 24 * 60;
-}
-}
-
-const dx = player.targetX - player.x;
-const dy = player.targetY - player.y;
-const dist = Math.hypot(dx, dy);
-
-if (dist > 1.5) {
-const moveDist = Math.min(dist, player.speed);
-const nextX = player.x + (dx / dist) * moveDist;
-const nextY = player.y + (dy / dist) * moveDist;
-
-let canMoveX = !checkCollision(nextX, player.y, gameState);
-let canMoveY = !checkCollision(player.x, nextY, gameState);
-
-if (canMoveX) player.x = nextX;
-if (canMoveY) player.y = nextY;
-
-if (!canMoveX && !canMoveY) {
-player.targetX = player.x;
-player.targetY = player.y;
-}
-} else {
-player.x = player.targetX;
-player.y = player.targetY;
-}
-}
-
-function nextDay() {
-startFade(function() {
-currentDay++;
-if (currentDay > 20) {
-currentDay = 1;
-currentSeasonIdx = (currentSeasonIdx + 1) % 4;
-}
-gameTime = 6 * 60;
-
-farmTiles.forEach(function(tile) {
-if (tile.crop && tile.watered) {
-tile.crop.progressDays += 1;
-}
-tile.watered = false;
-});
-
-gameState = 'HOUSE';
-player.x = 240;
-player.y = 380;
-player.targetX = 240;
-player.targetY = 380;
-player.direction = 'SOUTH';
-player.isSleeping = false;
-showToast('새로운 하루가 시작되었습니다.');
-});
-}
-
-function startFade(callback) {
-fadeState = 'OUT';
-pendingSceneChange = callback;
-}
-
-function addItemToInventory(item) {
-for (let i = 2; i < 4; i++) {
-if (!hotbar[i]) {
-hotbar[i] = item;
-return true;
-} else if (hotbar[i].id === item.id) {
-hotbar[i].count += item.count;
-return true;
-}
-}
-for (let i = 0; i < bagInventory.length; i++) {
-if (!bagInventory[i]) {
-bagInventory[i] = item;
-return true;
-} else if (bagInventory[i].id === item.id) {
-bagInventory[i].count += item.count;
-return true;
-}
-}
-return false;
-}
-
-canvas.addEventListener('pointerdown', function(e) {
-const rect = canvas.getBoundingClientRect();
-const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
-const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-if (fadeState !== 'NONE') return;
-
-if (gameState === 'TITLE') {
-titleButtons.forEach(function(btn) {
-if (clickX >= btn.x && clickX <= btn.x + btn.w && clickY >= btn.y && clickY <= btn.y + btn.h) {
-if (btn.id === 'start') {
-startFade(function() {
-gameState = 'HOUSE';
-player.x = 240;
-player.y = 480;
-player.targetX = 240;
-player.targetY = 480;
-player.direction = 'NORTH';
-});
-} else if (btn.id === 'option') {
-showToast('옵션 메뉴입니다.');
-} else if (btn.id === 'exit') {
-alert('게임을 종료합니다.');
-}
-}
-});
-return;
-}
-
-if (isBagOpen) {
-const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
-if (clickX < bagX || clickX > bagX + bagW || clickY < bagY || clickY > bagY + bagH) {
-isBagOpen = false;
-}
-return;
-}
-
-if (clickX >= 10 && clickX <= 65) {
-const startY = 100;
-const slotH = 48;
-for (let i = 0; i < 4; i++) {
-const sy = startY + i * slotH;
-if (clickY >= sy && clickY <= sy + slotH) {
-selectedHotbarSlot = (selectedHotbarSlot === i) ? -1 : i;
-return;
-}
-}
-}
-
-if (gameState === 'FARM' &&
-clickX >= farmOffsetX && clickX <= farmOffsetX + FARM_COLS * tileW &&
-clickY >= farmOffsetY && clickY <= farmOffsetY + FARM_ROWS * tileH) {
-
-const col = Math.floor((clickX - farmOffsetX) / tileW);
-const row = Math.floor((clickY - farmOffsetY) / tileH);
-
-if (col >= 0 && col < FARM_COLS && row >= 0 && row < FARM_ROWS) {
-const tileIdx = row * FARM_COLS + col;
-const tile = farmTiles[tileIdx];
-
-const tileCenterX = farmOffsetX + col * tileW + tileW / 2;
-const tileCenterY = farmOffsetY + row * tileH + tileH / 2;
-
-const dx = tileCenterX - player.x;
-const dy = tileCenterY - player.y;
-const distToTile = Math.hypot(dx, dy);
-
-if (distToTile > 25) {
-player.targetX = tileCenterX - (dx / distToTile) * 20;
-player.targetY = tileCenterY - (dy / distToTile) * 20;
-} else {
-player.targetX = player.x;
-player.targetY = player.y;
-}
-
-updatePlayerDirection(tileCenterX, tileCenterY);
-
-if (getDistance(player.x, player.y, tileCenterX, tileCenterY) > INTERACTION_DISTANCE) {
-showToast('해당 밭 칸으로 더 가까이 이동하세요.');
-return;
-}
-
-const activeItem = selectedHotbarSlot >= 0 ? hotbar[selectedHotbarSlot] : null;
-
-if (activeItem && activeItem.id === 'rake') {
-tile.tilled = true;
-} else if (activeItem && activeItem.id === 'can') {
-tile.watered = true;
-} else if (activeItem && activeItem.type === 'seed') {
-if (tile.tilled && !tile.crop) {
-tile.crop = { id: activeItem.cropId, progressDays: 0, growthDays: CROP_DATA[activeItem.cropId].growthDays };
-activeItem.count--;
-if (activeItem.count <= 0) hotbar[selectedHotbarSlot] = null;
-showToast('씨앗을 심었습니다.');
-} else if (!tile.tilled) {
-showToast('먼저 땅을 갈아주세요.');
-}
-} else if (selectedHotbarSlot === -1) {
-if (tile.crop && tile.crop.progressDays >= tile.crop.growthDays) {
-const min = CROP_DATA[tile.crop.id].minYield;
-const max = CROP_DATA[tile.crop.id].maxYield;
-const yieldCount = Math.floor(Math.random() * (max - min + 1)) + min;
-addItemToInventory({ type: 'crop', id: tile.crop.id, name: '감자', count: yieldCount });
-tile.crop = null;
-showToast('감자 ' + yieldCount + '개를 수확했습니다.');
-}
-}
-return;
-}
-}
-
-updatePlayerDirection(clickX, clickY);
-player.targetX = clickX;
-player.targetY = clickY;
-
-if (gameState === 'HOUSE') {
-if (clickX >= 310 && clickX <= 435 && clickY >= 230 && clickY <= 440) {
-if (getDistance(player.x, player.y, 300, 320) <= INTERACTION_DISTANCE) {
-nextDay();
-} else {
-showToast('침대로 가까이 이동하세요.');
-}
-return;
-}
-
-if (clickX >= 140 && clickX <= 220 && clickY >= 610 && clickY <= 690) {
-if (getDistance(player.x, player.y, 180, 590) <= INTERACTION_DISTANCE) {
-startFade(function() {
-gameState = 'FARM';
-player.x = 335;
-player.y = 255;
-player.targetX = 335;
-player.targetY = 255;
-player.direction = 'SOUTH';
-});
-} else {
-showToast('문으로 더 가까이 오세요.');
-}
-return;
-}
-}
-else if (gameState === 'FARM') {
-if (clickX >= 290 && clickX <= 380 && clickY >= 140 && clickY <= 250) {
-if (getDistance(player.x, player.y, 335, 255) <= INTERACTION_DISTANCE) {
-startFade(function() {
-gameState = 'HOUSE';
-player.x = 180;
-player.y = 570;
-player.targetX = 180;
-player.targetY = 570;
-player.direction = 'NORTH';
-});
-} else {
-showToast('집 입구로 가까이 오세요.');
-}
-return;
-}
-
-if (clickX >= 200 && clickX <= 270 && clickY >= 140 && clickY <= 220) {
-if (getDistance(player.x, player.y, 235, 180) <= INTERACTION_DISTANCE) {
-if (mailboxHasSeed) {
-mailboxHasSeed = false;
-addItemToInventory({ type: 'seed', id: 'potato_seed', name: '감자 씨앗', cropId: 'potato', count: 6 });
-showToast('감자 씨앗 6개를 획득했습니다.');
-} else {
-showToast('우체통이 비어있습니다.');
-}
-} else {
-showToast('우체통으로 가까이 이동하세요.');
-}
-return;
-}
-}
-});
-
-function render() {
-ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-if (gameState === 'TITLE') renderTitleScreen();
-else if (gameState === 'HOUSE') { renderHouseMap(); renderPlayer(); renderUI(); }
-else if (gameState === 'FARM') { renderFarmMap(); renderPlayer(); renderUI(); }
-
-if (toastTimer > 0) {
-ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-ctx.fillRect(80, 640, 320, 36);
-ctx.strokeStyle = '#c78d53';
-ctx.lineWidth = 2;
-ctx.strokeRect(80, 640, 320, 36);
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 13px monospace';
-ctx.textAlign = 'center';
-ctx.fillText(toastMessage, 240, 663);
-}
-
-if (fadeAlpha > 0) {
-ctx.fillStyle = 'rgba(0, 0, 0, ' + fadeAlpha + ')';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-}
-
-function renderTitleScreen() {
-if (titleImage.complete && titleImage.naturalWidth !== 0) {
-ctx.drawImage(titleImage, 0, 0, canvas.width, canvas.height);
-} else {
-ctx.fillStyle = '#1e272e';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 20px monospace';
-ctx.textAlign = 'center';
-ctx.fillText('타이틀 화면 로딩 중...', canvas.width / 2, canvas.height / 2);
-}
-}
-
-function applyTimeOverlay() {
-const period = getTimePeriod(gameTime);
-if (period === 'EVENING') {
-ctx.fillStyle = 'rgba(230, 110, 30, 0.25)';
-} else if (period === 'NIGHT') {
-ctx.fillStyle = 'rgba(15, 20, 60, 0.55)';
-} else if (period === 'DAWN') {
-ctx.fillStyle = 'rgba(60, 30, 80, 0.45)';
-}
-if (period !== 'MORNING') {
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-}
-
-function drawBackgroundImage(imgKey) {
-const img = bgImages[imgKey];
-if (img && img.complete && img.naturalWidth !== 0) {
-ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-} else {
-ctx.fillStyle = '#222';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-}
-
-function renderHouseMap() {
-const period = getTimePeriod(gameTime);
-drawBackgroundImage(period + '_HOUSE');
-applyTimeOverlay();
-}
-
-function renderFarmMap() {
-const period = getTimePeriod(gameTime);
-drawBackgroundImage(period + '_FARM');
-
-if (mailboxHasSeed && uiImages.noticeIcon.complete && uiImages.noticeIcon.naturalWidth !== 0) {
-ctx.drawImage(uiImages.noticeIcon, 230, 125, 24, 24);
-}
-
-for (let r = 0; r < FARM_ROWS; r++) {
-for (let c = 0; c < FARM_COLS; c++) {
-const idx = r * FARM_COLS + c;
-const tile = farmTiles[idx];
-const tx = farmOffsetX + c * tileW;
-const ty = farmOffsetY + r * tileH;
-
-if (tile.tilled) {
-ctx.fillStyle = 'rgba(80, 45, 22, 0.2)';
-ctx.fillRect(tx + 1, ty + 1, tileW - 2, tileH - 2);
-}
-
-if (tile.watered) {
-ctx.fillStyle = 'rgba(20, 10, 5, 0.35)';
-ctx.fillRect(tx + 1, ty + 1, tileW - 2, tileH - 2);
-}
-
-if (tile.crop) {
-let stageIdx = 0;
-if (tile.crop.progressDays >= tile.crop.growthDays) {
-stageIdx = 2;
-} else if (tile.crop.progressDays > 0) {
-stageIdx = 1;
-} else {
-stageIdx = 0;
-}
-
-const img = cropImages[tile.crop.id][stageIdx];
-if (img && img.complete && img.naturalWidth !== 0) {
-const cropX = tx + (tileW - 32) / 2;
-const cropY = ty + (tileH - 32) / 2;
-ctx.drawImage(img, cropX, cropY, 32, 32);
-}
-}
-}
-}
-
-applyTimeOverlay();
-}
-
-function renderPlayerImage(x, y, dir, scale) {
-if (!scale) scale = 0.28;
-const img = charImages[dir];
-if (img && img.complete && img.naturalWidth !== 0) {
-const w = img.width * scale;
-const h = img.height * scale;
-ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
-} else {
-ctx.fillStyle = '#c0392b';
-ctx.fillRect(x - 10, y - 15, 20, 30);
-}
-}
-
-function renderPlayer() {
-renderPlayerImage(player.x, player.y, player.direction, 0.28);
-}
-
-function renderItemIcon(item, x, y, size) {
-if (!item) return;
-const img = itemImages[item.id];
-if (img && img.complete && img.naturalWidth !== 0) {
-ctx.drawImage(img, x, y, size, size);
-}
-}
-
-function renderUI() {
-const seasonX = 10, seasonY = 10, seasonSize = 65;
-if (uiImages.season.complete && uiImages.season.naturalWidth !== 0) {
-ctx.drawImage(uiImages.season, seasonX, seasonY, seasonSize, seasonSize);
-}
-ctx.fillStyle = '#5c311e';
-ctx.font = 'bold 18px monospace';
-ctx.textAlign = 'center';
-ctx.fillText(SEASONS[currentSeasonIdx], seasonX + seasonSize / 2, seasonY + seasonSize / 2 + 6);
-
-const dtX = 80, dtY = 10, dtW = 140, dtH = 65;
-if (uiImages.dateTime.complete && uiImages.dateTime.naturalWidth !== 0) {
-ctx.drawImage(uiImages.dateTime, dtX, dtY, dtW, dtH);
-}
-
-ctx.fillStyle = '#a83232';
-ctx.font = 'bold 13px monospace';
-ctx.textAlign = 'center';
-ctx.fillText(currentDay + '일', dtX + 70, dtY + 28);
-
-ctx.fillStyle = '#3d2314';
-ctx.font = 'bold 12px monospace';
-ctx.textAlign = 'center';
-ctx.fillText(formatGameTime(gameTime), dtX + 70, dtY + 52);
-
-const invX = 10, invY = 100, invW = 55, invH = 250;
-if (uiImages.inventory.complete && uiImages.inventory.naturalWidth !== 0) {
-ctx.drawImage(uiImages.inventory, invX, invY, invW, invH);
-}
-
-const slotH = 48;
-for (let i = 0; i < 4; i++) {
-const slotY = invY + 8 + i * slotH;
-
-if (selectedHotbarSlot === i) {
-ctx.strokeStyle = '#f39c12';
-ctx.lineWidth = 3;
-ctx.strokeRect(invX + 6, slotY, 43, 43);
-}
-
-const item = hotbar[i];
-if (item) {
-renderItemIcon(item, invX + 11, slotY + 5, 32);
-if (item.count > 1) {
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 11px monospace';
-ctx.textAlign = 'right';
-ctx.fillText(item.count, invX + 44, slotY + 40);
-}
-}
-}
-
-if (isBagOpen) {
-const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
-
-if (uiImages.bagGrid.complete && uiImages.bagGrid.naturalWidth !== 0) {
-ctx.drawImage(uiImages.bagGrid, bagX, bagY, bagW, bagH);
-} else {
-ctx.fillStyle = 'rgba(20, 12, 8, 0.95)';
-ctx.fillRect(bagX, bagY, bagW, bagH);
-}
-
-const gridStartX = bagX + 22;
-const gridStartY = bagY + 22;
-const cellW = 56;
-const cellH = 52;
-
-for (let r = 0; r < 5; r++) {
-for (let c = 0; c < 6; c++) {
-const idx = r * 6 + c;
-const item = bagInventory[idx];
-if (item) {
-const itemX = gridStartX + c * cellW + 10;
-const itemY = gridStartY + r * cellH + 8;
-renderItemIcon(item, itemX, itemY, 32);
-
-if (item.count > 1) {
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 11px monospace';
-ctx.textAlign = 'right';
-ctx.fillText(item.count, itemX + 34, itemY + 36);
-}
-}
-}
-}
-}
-}
-
-gameLoop();
+  const canvas = document.getElementById('gameCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.imageSmoothingEnabled = false;
+
+  const titleImage = new Image();
+  titleImage.src = '타이틀.jpg';
+
+  const charImages = {
+    SOUTH: new Image(),
+    NORTH: new Image(),
+    EAST: new Image(),
+    WEST: new Image()
+  };
+  charImages.SOUTH.src = 'south.png';
+  charImages.NORTH.src = 'north.png';
+  charImages.EAST.src = 'east.png';
+  charImages.WEST.src = 'west.png';
+
+  const uiImages = {
+    dateTime: new Image(),
+    inventory: new Image(),
+    season: new Image(),
+    bagGrid: new Image(),
+    noticeIcon: new Image()
+  };
+  uiImages.dateTime.src = 'ui_datetime.png';
+  uiImages.inventory.src = 'ui_inventory.png';
+  uiImages.season.src = 'ui_season.png';
+  uiImages.bagGrid.src = 'ui_bag_grid.png';
+  uiImages.noticeIcon.src = 'icon_notice.png';
+
+  const itemImages = {
+    rake: new Image(),
+    can: new Image(),
+    potato_seed: new Image(),
+    potato: new Image()
+  };
+  itemImages.rake.src = 'item_rake.png';
+  itemImages.can.src = 'item_can.png';
+  itemImages.potato_seed.src = 'item_potato_seed.png';
+  itemImages.potato.src = 'item_potato.png';
+
+  const cropImages = {
+    potato: [
+      new Image(),
+      new Image(),
+      new Image()
+    ]
+  };
+  cropImages.potato[0].src = 'crop_potato_stage1.png';
+  cropImages.potato[1].src = 'crop_potato_stage2.png';
+  cropImages.potato[2].src = 'crop_potato_stage3.png';
+
+  const bgImages = {
+    MORNING_HOUSE: new Image(),
+    MORNING_FARM: new Image(),
+    EVENING_HOUSE: new Image(),
+    EVENING_FARM: new Image(),
+    NIGHT_HOUSE: new Image(),
+    NIGHT_FARM: new Image(),
+    DAWN_HOUSE: new Image(),
+    DAWN_FARM: new Image()
+  };
+
+  bgImages.MORNING_HOUSE.src = 'house_morning.png';
+  bgImages.MORNING_FARM.src = 'farm_morning.png';
+  bgImages.EVENING_HOUSE.src = 'house_evening.png';
+  bgImages.EVENING_FARM.src = 'farm_evening.png';
+  bgImages.NIGHT_HOUSE.src = 'house_night.png';
+  bgImages.NIGHT_FARM.src = 'farm_night.png';
+  bgImages.DAWN_HOUSE.src = 'house_dawn.png';
+  bgImages.DAWN_FARM.src = 'farm_dawn.png';
+
+  let gameState = 'TITLE';
+  let fadeAlpha = 0;
+  let fadeState = 'NONE';
+  let pendingSceneChange = null;
+  let toastMessage = '';
+  let toastTimer = 0;
+
+  const INTERACTION_DISTANCE = 80;
+
+  const SEASONS = ['봄', '여름', '가을', '겨울'];
+  let currentSeasonIdx = 0;
+  let currentDay = 1;
+  let gameTime = 6 * 60;
+
+  let selectedHotbarSlot = 0;
+  let isBagOpen = false;
+  let mailboxHasSeed = true;
+
+  const hotbar = [
+    { type: 'tool', id: 'rake', name: '갈퀴', count: 1 },
+    { type: 'tool', id: 'can', name: '물뿌리개', count: 1 },
+    { type: 'seed', id: 'potato_seed', name: '감자 씨앗', cropId: 'potato', count: 6 },
+    null
+  ];
+  const bagInventory = new Array(30).fill(null);
+
+  const player = {
+    x: 240,
+    y: 360,
+    targetX: 240,
+    targetY: 360,
+    speed: 3.5,
+    direction: 'SOUTH',
+    isSleeping: false
+  };
+
+  const FARM_COLS = 6;
+  const FARM_ROWS = 10;
+  const farmOffsetX = 50;
+  const farmOffsetY = 260;
+  const tileW = 43.3;
+  const tileH = 41.5;
+
+  const farmTiles = Array.from({ length: FARM_ROWS * FARM_COLS }, function() {
+    return {
+      tilled: false,
+      watered: false,
+      crop: null
+    };
+  });
+
+  const CROP_DATA = {
+    potato: { name: '감자', seasons: ['봄'], growthDays: 3, minYield: 2, maxYield: 4 }
+  };
+
+  const titleButtons = [
+    { id: 'start', x: 130, y: 320, w: 180, h: 65 },
+    { id: 'option', x: 130, y: 410, w: 180, h: 65 },
+    { id: 'exit', x: 130, y: 500, w: 180, h: 65 }
+  ];
+
+  function checkCollision(x, y, scene) {
+    const pRadius = 8;
+    const pBox = {
+      left: x - pRadius,
+      right: x + pRadius,
+      top: y - 4,
+      bottom: y + pRadius
+    };
+
+    let obstacles = [];
+
+    if (scene === 'FARM') {
+      obstacles = [
+        { x: 0, y: 0, w: 260, h: 140 },
+        { x: 0, y: 140, w: 25, h: 540 },
+        { x: 0, y: 680, w: 480, h: 40 },
+        { x: 260, y: 0, w: 220, h: 260 },
+        { x: 210, y: 135, w: 50, h: 85 },
+        { x: 460, y: 220, w: 20, h: 200 }
+      ];
+    } else if (scene === 'HOUSE') {
+      obstacles = [
+        { x: 0, y: 0, w: 480, h: 300 },
+        { x: 0, y: 0, w: 65, h: 720 },
+        { x: 435, y: 0, w: 45, h: 720 },
+        { x: 0, y: 600, w: 140, h: 120 },
+        { x: 220, y: 600, w: 260, h: 120 },
+        { x: 95, y: 280, w: 95, h: 130 },
+        { x: 115, y: 430, w: 45, h: 60 },
+        { x: 325, y: 230, w: 110, h: 210 }
+      ];
+    }
+
+    for (let i = 0; i < obstacles.length; i++) {
+      const obs = obstacles[i];
+      if (pBox.right > obs.x && pBox.left < obs.x + obs.w &&
+          pBox.bottom > obs.y && pBox.top < obs.y + obs.h) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function getDistance(x1, y1, x2, y2) {
+    return Math.hypot(x2 - x1, y2 - y1);
+  }
+
+  function showToast(msg) {
+    toastMessage = msg;
+    toastTimer = 2.0;
+  }
+
+  function updatePlayerDirection(targetX, targetY) {
+    const dx = targetX - player.x;
+    const dy = targetY - player.y;
+
+    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      player.direction = dx > 0 ? 'EAST' : 'WEST';
+    } else {
+      player.direction = dy > 0 ? 'SOUTH' : 'NORTH';
+    }
+  }
+
+  function getTimePeriod(timeInMinutes) {
+    const hour = Math.floor(timeInMinutes / 60) % 24;
+    if (hour >= 6 && hour < 18) return 'MORNING';
+    if (hour >= 18 && hour < 21) return 'EVENING';
+    if (hour >= 21 || hour < 4) return 'NIGHT';
+    return 'DAWN';
+  }
+
+  function formatGameTime(timeInMinutes) {
+    const totalMin = Math.floor(timeInMinutes) % (24 * 60);
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours % 12 === 0 ? 12 : hours % 12;
+    const displayMin = String(mins).padStart(2, '0');
+    return displayHour + ':' + displayMin + ' ' + period;
+  }
+
+  let lastTime = performance.now();
+  function gameLoop() {
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+
+    update(dt);
+    render();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function update(dt) {
+    if (toastTimer > 0) toastTimer -= dt;
+
+    if (fadeState === 'OUT') {
+      fadeAlpha += dt * 2.5;
+      if (fadeAlpha >= 1) {
+        fadeAlpha = 1;
+        if (pendingSceneChange) {
+          pendingSceneChange();
+          pendingSceneChange = null;
+        }
+        fadeState = 'IN';
+      }
+    } else if (fadeState === 'IN') {
+      fadeAlpha -= dt * 2.5;
+      if (fadeAlpha <= 0) {
+        fadeAlpha = 0;
+        fadeState = 'NONE';
+      }
+    }
+
+    if (gameState === 'TITLE') return;
+
+    if (!player.isSleeping) {
+      const hour = Math.floor(gameTime / 60) % 24;
+      let timeSpeed = 1;
+
+      if (hour >= 6 && hour < 18) {
+        timeSpeed = 720 / 360;
+      } else if (hour >= 18 && hour < 21) {
+        timeSpeed = 180 / 180;
+      } else if (hour >= 21 || hour < 4) {
+        timeSpeed = 420 / 180;
+      } else {
+        timeSpeed = 120 / 180;
+      }
+
+      gameTime += dt * timeSpeed;
+
+      if (gameTime >= 24 * 60) {
+        gameTime -= 24 * 60;
+      }
+    }
+
+    const dx = player.targetX - player.x;
+    const dy = player.targetY - player.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > 1.5) {
+      const moveDist = Math.min(dist, player.speed);
+      const nextX = player.x + (dx / dist) * moveDist;
+      const nextY = player.y + (dy / dist) * moveDist;
+
+      let canMoveX = !checkCollision(nextX, player.y, gameState);
+      let canMoveY = !checkCollision(player.x, nextY, gameState);
+
+      if (canMoveX) player.x = nextX;
+      if (canMoveY) player.y = nextY;
+
+      if (!canMoveX && !canMoveY) {
+        player.targetX = player.x;
+        player.targetY = player.y;
+      }
+    } else {
+      player.x = player.targetX;
+      player.y = player.targetY;
+    }
+  }
+
+  function nextDay() {
+    startFade(function() {
+      currentDay++;
+      if (currentDay > 20) {
+        currentDay = 1;
+        currentSeasonIdx = (currentSeasonIdx + 1) % 4;
+      }
+      gameTime = 6 * 60;
+
+      farmTiles.forEach(function(tile) {
+        if (tile.crop && tile.watered) {
+          tile.crop.progressDays += 1;
+        }
+        tile.watered = false;
+      });
+
+      gameState = 'HOUSE';
+      player.x = 240;
+      player.y = 380;
+      player.targetX = 240;
+      player.targetY = 380;
+      player.direction = 'SOUTH';
+      player.isSleeping = false;
+      showToast('새로운 하루가 시작되었습니다.');
+    });
+  }
+
+  function startFade(callback) {
+    fadeState = 'OUT';
+    pendingSceneChange = callback;
+  }
+
+  function addItemToInventory(item) {
+    for (let i = 2; i < 4; i++) {
+      if (!hotbar[i]) {
+        hotbar[i] = item;
+        return true;
+      } else if (hotbar[i].id === item.id) {
+        hotbar[i].count += item.count;
+        return true;
+      }
+    }
+    for (let i = 0; i < bagInventory.length; i++) {
+      if (!bagInventory[i]) {
+        bagInventory[i] = item;
+        return true;
+      } else if (bagInventory[i].id === item.id) {
+        bagInventory[i].count += item.count;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  canvas.addEventListener('pointerdown', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+    if (fadeState !== 'NONE') return;
+
+    if (gameState === 'TITLE') {
+      titleButtons.forEach(function(btn) {
+        if (clickX >= btn.x && clickX <= btn.x + btn.w && clickY >= btn.y && clickY <= btn.y + btn.h) {
+          if (btn.id === 'start') {
+            startFade(function() {
+              gameState = 'HOUSE';
+              player.x = 240;
+              player.y = 480;
+              player.targetX = 240;
+              player.targetY = 480;
+              player.direction = 'NORTH';
+            });
+          } else if (btn.id === 'option') {
+            showToast('옵션 메뉴입니다.');
+          } else if (btn.id === 'exit') {
+            alert('게임을 종료합니다.');
+          }
+        }
+      });
+      return;
+    }
+
+    if (isBagOpen) {
+      const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
+      if (clickX < bagX || clickX > bagX + bagW || clickY < bagY || clickY > bagY + bagH) {
+        isBagOpen = false;
+      }
+      return;
+    }
+
+    if (clickX >= 10 && clickX <= 65) {
+      const startY = 100;
+      const slotH = 48;
+      for (let i = 0; i < 4; i++) {
+        const sy = startY + i * slotH;
+        if (clickY >= sy && clickY <= sy + slotH) {
+          selectedHotbarSlot = (selectedHotbarSlot === i) ? -1 : i;
+          return;
+        }
+      }
+    }
+
+    if (gameState === 'FARM' &&
+        clickX >= farmOffsetX && clickX <= farmOffsetX + FARM_COLS * tileW &&
+        clickY >= farmOffsetY && clickY <= farmOffsetY + FARM_ROWS * tileH) {
+
+      const col = Math.floor((clickX - farmOffsetX) / tileW);
+      const row = Math.floor((clickY - farmOffsetY) / tileH);
+
+      if (col >= 0 && col < FARM_COLS && row >= 0 && row < FARM_ROWS) {
+        const tileIdx = row * FARM_COLS + col;
+        const tile = farmTiles[tileIdx];
+
+        const tileCenterX = farmOffsetX + col * tileW + tileW / 2;
+        const tileCenterY = farmOffsetY + row * tileH + tileH / 2;
+
+        const dx = tileCenterX - player.x;
+        const dy = tileCenterY - player.y;
+        const distToTile = Math.hypot(dx, dy);
+
+        if (distToTile > 25) {
+          player.targetX = tileCenterX - (dx / distToTile) * 20;
+          player.targetY = tileCenterY - (dy / distToTile) * 20;
+        } else {
+          player.targetX = player.x;
+          player.targetY = player.y;
+        }
+
+        updatePlayerDirection(tileCenterX, tileCenterY);
+
+        if (getDistance(player.x, player.y, tileCenterX, tileCenterY) > INTERACTION_DISTANCE) {
+          showToast('해당 밭 칸으로 더 가까이 이동하세요.');
+          return;
+        }
+
+        const activeItem = selectedHotbarSlot >= 0 ? hotbar[selectedHotbarSlot] : null;
+
+        if (activeItem && activeItem.id === 'rake') {
+          tile.tilled = true;
+        } else if (activeItem && activeItem.id === 'can') {
+          tile.watered = true;
+        } else if (activeItem && activeItem.type === 'seed') {
+          if (tile.tilled && !tile.crop) {
+            tile.crop = { id: activeItem.cropId, progressDays: 0, growthDays: CROP_DATA[activeItem.cropId].growthDays };
+            activeItem.count--;
+            if (activeItem.count <= 0) hotbar[selectedHotbarSlot] = null;
+            showToast('씨앗을 심었습니다.');
+          } else if (!tile.tilled) {
+            showToast('먼저 땅을 갈아주세요.');
+          }
+        } else if (selectedHotbarSlot === -1) {
+          if (tile.crop && tile.crop.progressDays >= tile.crop.growthDays) {
+            const min = CROP_DATA[tile.crop.id].minYield;
+            const max = CROP_DATA[tile.crop.id].maxYield;
+            const yieldCount = Math.floor(Math.random() * (max - min + 1)) + min;
+            addItemToInventory({ type: 'crop', id: tile.crop.id, name: '감자', count: yieldCount });
+            tile.crop = null;
+            showToast('감자 ' + yieldCount + '개를 수확했습니다.');
+          }
+        }
+        return;
+      }
+    }
+
+    updatePlayerDirection(clickX, clickY);
+    player.targetX = clickX;
+    player.targetY = clickY;
+
+    if (gameState === 'HOUSE') {
+      if (clickX >= 310 && clickX <= 435 && clickY >= 230 && clickY <= 440) {
+        if (getDistance(player.x, player.y, 300, 320) <= INTERACTION_DISTANCE) {
+          nextDay();
+        } else {
+          showToast('침대로 가까이 이동하세요.');
+        }
+        return;
+      }
+
+      if (clickX >= 140 && clickX <= 220 && clickY >= 610 && clickY <= 690) {
+        if (getDistance(player.x, player.y, 180, 590) <= INTERACTION_DISTANCE) {
+          startFade(function() {
+            gameState = 'FARM';
+            player.x = 335;
+            player.y = 255;
+            player.targetX = 335;
+            player.targetY = 255;
+            player.direction = 'SOUTH';
+          });
+        } else {
+          showToast('문으로 더 가까이 오세요.');
+        }
+        return;
+      }
+    }
+    else if (gameState === 'FARM') {
+      if (clickX >= 290 && clickX <= 380 && clickY >= 140 && clickY <= 250) {
+        if (getDistance(player.x, player.y, 335, 255) <= INTERACTION_DISTANCE) {
+          startFade(function() {
+            gameState = 'HOUSE';
+            player.x = 180;
+            player.y = 570;
+            player.targetX = 180;
+            player.targetY = 570;
+            player.direction = 'NORTH';
+          });
+        } else {
+          showToast('집 입구로 가까이 오세요.');
+        }
+        return;
+      }
+
+      if (clickX >= 200 && clickX <= 270 && clickY >= 140 && clickY <= 220) {
+        if (getDistance(player.x, player.y, 235, 180) <= INTERACTION_DISTANCE) {
+          if (mailboxHasSeed) {
+            mailboxHasSeed = false;
+            addItemToInventory({ type: 'seed', id: 'potato_seed', name: '감자 씨앗', cropId: 'potato', count: 6 });
+            showToast('감자 씨앗 6개를 획득했습니다.');
+          } else {
+            showToast('우체통이 비어있습니다.');
+          }
+        } else {
+          showToast('우체통으로 가까이 이동하세요.');
+        }
+        return;
+      }
+    }
+  });
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (gameState === 'TITLE') renderTitleScreen();
+    else if (gameState === 'HOUSE') { renderHouseMap(); renderPlayer(); renderUI(); }
+    else if (gameState === 'FARM') { renderFarmMap(); renderPlayer(); renderUI(); }
+
+    if (toastTimer > 0) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fillRect(80, 640, 320, 36);
+      ctx.strokeStyle = '#c78d53';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(80, 640, 320, 36);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(toastMessage, 240, 663);
+    }
+
+    if (fadeAlpha > 0) {
+      ctx.fillStyle = 'rgba(0, 0, 0, ' + fadeAlpha + ')';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function renderTitleScreen() {
+    if (titleImage.complete && titleImage.naturalWidth !== 0) {
+      ctx.drawImage(titleImage, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = '#1e272e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('타이틀 화면 로딩 중...', canvas.width / 2, canvas.height / 2);
+    }
+  }
+
+  function applyTimeOverlay() {
+    const period = getTimePeriod(gameTime);
+    if (period === 'EVENING') {
+      ctx.fillStyle = 'rgba(230, 110, 30, 0.25)';
+    } else if (period === 'NIGHT') {
+      ctx.fillStyle = 'rgba(15, 20, 60, 0.55)';
+    } else if (period === 'DAWN') {
+      ctx.fillStyle = 'rgba(60, 30, 80, 0.45)';
+    }
+    if (period !== 'MORNING') {
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function drawBackgroundImage(imgKey) {
+    const img = bgImages[imgKey];
+    if (img && img.complete && img.naturalWidth !== 0) {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function renderHouseMap() {
+    const period = getTimePeriod(gameTime);
+    drawBackgroundImage(period + '_HOUSE');
+    applyTimeOverlay();
+  }
+
+  function renderFarmMap() {
+    const period = getTimePeriod(gameTime);
+    drawBackgroundImage(period + '_FARM');
+
+    if (mailboxHasSeed && uiImages.noticeIcon.complete && uiImages.noticeIcon.naturalWidth !== 0) {
+      ctx.drawImage(uiImages.noticeIcon, 230, 125, 24, 24);
+    }
+
+    for (let r = 0; r < FARM_ROWS; r++) {
+      for (let c = 0; c < FARM_COLS; c++) {
+        const idx = r * FARM_COLS + c;
+        const tile = farmTiles[idx];
+        const tx = farmOffsetX + c * tileW;
+        const ty = farmOffsetY + r * tileH;
+
+        if (tile.tilled) {
+          ctx.fillStyle = 'rgba(80, 45, 22, 0.2)';
+          ctx.fillRect(tx + 1, ty + 1, tileW - 2, tileH - 2);
+        }
+
+        if (tile.watered) {
+          ctx.fillStyle = 'rgba(20, 10, 5, 0.35)';
+          ctx.fillRect(tx + 1, ty + 1, tileW - 2, tileH - 2);
+        }
+
+        if (tile.crop) {
+          let stageIdx = 0;
+          if (tile.crop.progressDays >= tile.crop.growthDays) {
+            stageIdx = 2;
+          } else if (tile.crop.progressDays > 0) {
+            stageIdx = 1;
+          } else {
+            stageIdx = 0;
+          }
+
+          const img = cropImages[tile.crop.id][stageIdx];
+          if (img && img.complete && img.naturalWidth !== 0) {
+            const cropX = tx + (tileW - 32) / 2;
+            const cropY = ty + (tileH - 32) / 2;
+            ctx.drawImage(img, cropX, cropY, 32, 32);
+          }
+        }
+      }
+    }
+
+    applyTimeOverlay();
+  }
+
+  function renderPlayerImage(x, y, dir, scale) {
+    if (!scale) scale = 0.28;
+    const img = charImages[dir];
+    if (img && img.complete && img.naturalWidth !== 0) {
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+    } else {
+      ctx.fillStyle = '#c0392b';
+      ctx.fillRect(x - 10, y - 15, 20, 30);
+    }
+  }
+
+  function renderPlayer() {
+    renderPlayerImage(player.x, player.y, player.direction, 0.28);
+  }
+
+  function renderItemIcon(item, x, y, size) {
+    if (!item) return;
+    const img = itemImages[item.id];
+    if (img && img.complete && img.naturalWidth !== 0) {
+      ctx.drawImage(img, x, y, size, size);
+    }
+  }
+
+  function renderUI() {
+    const seasonX = 10, seasonY = 10, seasonSize = 65;
+    if (uiImages.season.complete && uiImages.season.naturalWidth !== 0) {
+      ctx.drawImage(uiImages.season, seasonX, seasonY, seasonSize, seasonSize);
+    }
+    ctx.fillStyle = '#5c311e';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(SEASONS[currentSeasonIdx], seasonX + seasonSize / 2, seasonY + seasonSize / 2 + 6);
+
+    const dtX = 80, dtY = 10, dtW = 140, dtH = 65;
+    if (uiImages.dateTime.complete && uiImages.dateTime.naturalWidth !== 0) {
+      ctx.drawImage(uiImages.dateTime, dtX, dtY, dtW, dtH);
+    }
+
+    ctx.fillStyle = '#a83232';
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentDay + '일', dtX + 70, dtY + 28);
+
+    ctx.fillStyle = '#3d2314';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(formatGameTime(gameTime), dtX + 70, dtY + 52);
+
+    const invX = 10, invY = 100, invW = 55, invH = 250;
+    if (uiImages.inventory.complete && uiImages.inventory.naturalWidth !== 0) {
+      ctx.drawImage(uiImages.inventory, invX, invY, invW, invH);
+    }
+
+    const slotH = 48;
+    for (let i = 0; i < 4; i++) {
+      const slotY = invY + 8 + i * slotH;
+
+      if (selectedHotbarSlot === i) {
+        ctx.strokeStyle = '#f39c12';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(invX + 6, slotY, 43, 43);
+      }
+
+      const item = hotbar[i];
+      if (item) {
+        renderItemIcon(item, invX + 11, slotY + 5, 32);
+        if (item.count > 1) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'right';
+          ctx.fillText(item.count, invX + 44, slotY + 40);
+        }
+      }
+    }
+
+    if (isBagOpen) {
+      const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
+
+      if (uiImages.bagGrid.complete && uiImages.bagGrid.naturalWidth !== 0) {
+        ctx.drawImage(uiImages.bagGrid, bagX, bagY, bagW, bagH);
+      } else {
+        ctx.fillStyle = 'rgba(20, 12, 8, 0.95)';
+        ctx.fillRect(bagX, bagY, bagW, bagH);
+      }
+
+      const gridStartX = bagX + 22;
+      const gridStartY = bagY + 22;
+      const cellW = 56;
+      const cellH = 52;
+
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 6; c++) {
+          const idx = r * 6 + c;
+          const item = bagInventory[idx];
+          if (item) {
+            const itemX = gridStartX + c * cellW + 10;
+            const itemY = gridStartY + r * cellH + 8;
+            renderItemIcon(item, itemX, itemY, 32);
+
+            if (item.count > 1) {
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 11px monospace';
+              ctx.textAlign = 'right';
+              ctx.fillText(item.count, itemX + 34, itemY + 36);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  gameLoop();
 });
 </script>
 </body>
