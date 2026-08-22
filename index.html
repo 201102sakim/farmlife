@@ -55,7 +55,9 @@ window.addEventListener('DOMContentLoaded', function() {
 
   const titleImage = new Image();
   titleImage.src = 'title.png'; 
-
+titleImage.onerror = function() {
+  showToast('title.png 파일을 찾을 수 없습니다.');
+};
   const charImages = {
     SOUTH: new Image(),
     NORTH: new Image(),
