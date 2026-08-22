@@ -45,7 +45,7 @@ image-rendering: pixelated;
 </div>
 
 <script>
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', function() {
 const canvas = document.getElementById('gameCanvas');
 if (!canvas) return;
 const ctx = canvas.getContext('2d');
@@ -165,11 +165,13 @@ const farmOffsetY = 260;
 const tileW = 43.3;
 const tileH = 41.5;
 
-const farmTiles = Array.from({ length: FARM_ROWS * FARM_COLS }, () => ({
+const farmTiles = Array.from({ length: FARM_ROWS * FARM_COLS }, function() {
+return {
 tilled: false,
 watered: false,
 crop: null
-}));
+};
+});
 
 const CROP_DATA = {
 potato: { name: '감자', seasons: ['봄'], growthDays: 3, minYield: 2, maxYield: 4 }
@@ -214,7 +216,8 @@ obstacles = [
  ];
 }
 
-for (const obs of obstacles) {
+for (let i = 0; i < obstacles.length; i++) {
+const obs = obstacles[i];
 if (pBox.right > obs.x && pBox.left < obs.x + obs.w &&
 pBox.bottom > obs.y && pBox.top < obs.y + obs.h) {
 return true;
@@ -260,7 +263,7 @@ const mins = totalMin % 60;
 const period = hours >= 12 ? 'PM' : 'AM';
 const displayHour = hours % 12 === 0 ? 12 : hours % 12;
 const displayMin = String(mins).padStart(2, '0');
-return ${displayHour}:${displayMin} ${period}`;
+return displayHour + ':' + displayMin + ' ' + period;
 }
 
 let lastTime = performance.now();
@@ -345,7 +348,7 @@ player.y = player.targetY;
 }
 
 function nextDay() {
-startFade(() => {
+startFade(function() {
 currentDay++;
 if (currentDay > 20) {
 currentDay = 1;
@@ -353,7 +356,7 @@ currentSeasonIdx = (currentSeasonIdx + 1) % 4;
 }
 gameTime = 6 * 60;
 
-farmTiles.forEach(tile => {
+farmTiles.forEach(function(tile) {
 if (tile.crop && tile.watered) {
 tile.crop.progressDays += 1;
 }
@@ -398,7 +401,7 @@ return true;
 return false;
 }
 
-canvas.addEventListener('pointerdown', (e) => {
+canvas.addEventListener('pointerdown', function(e) {
 const rect = canvas.getBoundingClientRect();
 const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
 const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
@@ -406,10 +409,10 @@ const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
 if (fadeState !== 'NONE') return;
 
 if (gameState === 'TITLE') {
-titleButtons.forEach(btn => {
+titleButtons.forEach(function(btn) {
 if (clickX >= btn.x && clickX <= btn.x + btn.w && clickY >= btn.y && clickY <= btn.y + btn.h) {
 if (btn.id === 'start') {
-startFade(() => {
+startFade(function() {
 gameState = 'HOUSE';
 player.x = 240;
 player.y = 480;
@@ -502,7 +505,7 @@ const max = CROP_DATA[tile.crop.id].maxYield;
 const yieldCount = Math.floor(Math.random() * (max - min + 1)) + min;
 addItemToInventory({ type: 'crop', id: tile.crop.id, name: '감자', count: yieldCount });
 tile.crop = null;
-showToast(감자${yieldCount}개를 수확했습니다.`);
+showToast('감자 ' + yieldCount + '개를 수확했습니다.');
 }
 }
 return;
@@ -525,7 +528,7 @@ return;
 
 if (clickX >= 140 && clickX <= 220 && clickY >= 610 && clickY <= 690) {
 if (getDistance(player.x, player.y, 180, 590) <= INTERACTION_DISTANCE) {
-startFade(() => {
+startFade(function() {
 gameState = 'FARM';
 player.x = 335;
 player.y = 255;
@@ -542,7 +545,7 @@ return;
 else if (gameState === 'FARM') {
 if (clickX >= 290 && clickX <= 380 && clickY >= 140 && clickY <= 250) {
 if (getDistance(player.x, player.y, 335, 255) <= INTERACTION_DISTANCE) {
-startFade(() => {
+startFade(function() {
 gameState = 'HOUSE';
 player.x = 180;
 player.y = 570;
@@ -593,7 +596,7 @@ ctx.fillText(toastMessage, 240, 663);
 }
 
 if (fadeAlpha > 0) {
-ctx.fillStyle = rgba(0, 0, 0, ${fadeAlpha})`;
+ctx.fillStyle = 'rgba(0, 0, 0, ' + fadeAlpha + ')';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 }
@@ -637,13 +640,13 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 function renderHouseMap() {
 const period = getTimePeriod(gameTime);
-drawBackgroundImage(``${period}_HOUSE`);
+drawBackgroundImage(period + '_HOUSE');
 applyTimeOverlay();
 }
 
 function renderFarmMap() {
 const period = getTimePeriod(gameTime);
-drawBackgroundImage(${period}_FARM`);
+drawBackgroundImage(period + '_FARM');
 
 if (mailboxHasSeed && uiImages.noticeIcon.complete && uiImages.noticeIcon.naturalWidth !== 0) {
 ctx.drawImage(uiImages.noticeIcon, 230, 125, 24, 24);
@@ -689,7 +692,8 @@ ctx.drawImage(img, cropX, cropY, 32, 32);
 applyTimeOverlay();
 }
 
-function renderPlayerImage(x, y, dir, scale = 0.28) {
+function renderPlayerImage(x, y, dir, scale) {
+if (!scale) scale = 0.28;
 const img = charImages[dir];
 if (img && img.complete && img.naturalWidth !== 0) {
 const w = img.width * scale;
@@ -731,7 +735,7 @@ ctx.drawImage(uiImages.dateTime, dtX, dtY, dtW, dtH);
 ctx.fillStyle = '#a83232';
 ctx.font = 'bold 13px monospace';
 ctx.textAlign = 'center';
-ctx.fillText(``${currentDay}일`, dtX + 70, dtY + 28);
+ctx.fillText(currentDay + '일', dtX + 70, dtY + 28);
 
 ctx.fillStyle = '#3d2314';
 ctx.font = 'bold 12px monospace';
@@ -801,7 +805,7 @@ ctx.fillText(item.count, itemX + 34, itemY + 36);
 }
 }
 
-requestAnimationFrame(gameLoop);
+gameLoop();
 });
 </script>
 </body>
