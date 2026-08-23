@@ -52,9 +52,8 @@ window.addEventListener('DOMContentLoaded', () => {
   ctx.imageSmoothingEnabled = false;
 
   const titleImage = new Image();
-  titleImage.src = 'title.png';
+  titleImage.src = '타이틀.jpg';
 
-  // 4방향 보행 스프라이트 데이터
   const charSprites = {
     south: { img: new Image(), src: 'south_walk.png', loaded: false, cols: 7, rows: 2, walkFrames: [0, 2, 4, 6], offsets: [0, 2, 0, 2] },
     north: { img: new Image(), src: 'north_walk.png', loaded: false, cols: 7, rows: 2, walkFrames: [0, 2, 4, 6], offsets: [0, 2, 0, 2] },
@@ -193,11 +192,11 @@ window.addEventListener('DOMContentLoaded', () => {
   ];
 
   function checkCollision(x, y, scene) {
-    const pRadius = 8;
+    const pRadius = 12;
     const pBox = {
       left: x - pRadius,
       right: x + pRadius,
-      top: y - 4,
+      top: y - 6,
       bottom: y + pRadius
     };
 
@@ -354,7 +353,6 @@ window.addEventListener('DOMContentLoaded', () => {
       player.isMoving = false;
     }
 
-    // 애니메이션 프레임 업데이트
     if (player.isMoving) {
       player.frameTimer++;
       if (player.frameTimer % 8 === 0) {
@@ -756,7 +754,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const active = charSprites[activeKey];
 
     if (active && active.loaded) {
-      const RENDER_HEIGHT = 72;
+      // 캐릭터 세로 크기를 기존 72에서 110으로 확대
+      const RENDER_HEIGHT = 110;
       const renderWidth = (active.frameW / active.frameH) * RENDER_HEIGHT;
 
       const currentFrame = active.walkFrames[player.frameIndex] || 0;
@@ -765,7 +764,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const offsetY = player.isMoving ? active.offsets[player.frameIndex] : 0;
 
       const drawX = player.x - renderWidth / 2;
-      const drawY = player.y - RENDER_HEIGHT + 12 + offsetY;
+      const drawY = player.y - RENDER_HEIGHT + 16 + offsetY;
 
       ctx.save();
       if (player.direction === 'west') {
@@ -786,7 +785,7 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.restore();
     } else {
       ctx.fillStyle = '#c0392b';
-      ctx.fillRect(player.x - 10, player.y - 15, 20, 30);
+      ctx.fillRect(player.x - 12, player.y - 20, 24, 40);
     }
 
     if (selectedItemNoticeTimer > 0 && selectedItemNotice) {
@@ -804,7 +803,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const bgWidth = textMetrics.width + 12;
       const bgHeight = 18;
       const textX = player.x;
-      const textY = player.y - 68;
+      const textY = player.y - 100;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
       ctx.fillRect(textX - bgWidth / 2, textY - 13, bgWidth, bgHeight);
