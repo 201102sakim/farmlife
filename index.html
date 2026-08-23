@@ -55,6 +55,16 @@ ctx.imageSmoothingEnabled = false;
 const titleImage = new Image();
 titleImage.src = 'title.png';
 
+const doorImage = new Image();
+doorImage.src = 'door.png';
+
+const DOOR_POS = {
+x: 335,
+y: 16,
+w: 82,
+h: 88
+};
+
 const charSprites = {
 south: { img: new Image(), src: 'south_walk.png', loaded: false, cols: 7, rows: 2, walkFrames: [0, 2, 4, 6], offsets: [0, 2, 0, 2] },
 north: { img: new Image(), src: 'north_walk.png', loaded: false, cols: 7, rows: 2, walkFrames: [0, 2, 4, 6], offsets: [0, 2, 0, 2] },
@@ -79,14 +89,12 @@ const uiImages = {
 dateTime: new Image(),
 inventory: new Image(),
 season: new Image(),
-bagGrid: new Image(),
-noticeIcon: new Image()
+bagGrid: new Image()
 };
 uiImages.dateTime.src = 'ui_datetime.png';
 uiImages.inventory.src = 'ui_inventory.png';
 uiImages.season.src = 'ui_season.png';
 uiImages.bagGrid.src = 'ui_bag_grid.png';
-uiImages.noticeIcon.src = 'icon_notice.png';
 
 const itemImages = {
 rake: new Image(),
@@ -145,12 +153,10 @@ let gameTime = 6 * 60;
 
 let selectedHotbarSlot = 0;
 let isBagOpen = false;
-let mailboxHasSeed = true;
 
 let selectedItemNotice = '';
 let selectedItemNoticeTimer = 0;
 
-// 상호작용 가능 최대 거리 (약 1칸 거리)
 const INTERACTION_DIST = 55;
 
 const hotbar = [
@@ -213,21 +219,20 @@ obstacles = [
 { x: 0, y: 0, w: 260, h: 140 },
 { x: 0, y: 140, w: 25, h: 540 },
 { x: 0, y: 680, w: 480, h: 40 },
-{ x: 260, y: 0, w: 220, h: 240 },
+{ x: 260, y: 0, w: 220, h: 105 },
 { x: 210, y: 135, w: 50, h: 85 },
 { x: 460, y: 220, w: 20, h: 200 }
  ];
 } else if (scene === 'HOUSE') {
-// 집 내부 벽 및 테두리 충돌 영역 조정
 obstacles = [
-{ x: 0, y: 0, w: 480, h: 260 },       // 상단 벽/창문
-{ x: 0, y: 0, w: 65, h: 720 },        // 좌측 외벽
-{ x: 415, y: 0, w: 65, h: 720 },       // 우측 외벽
-{ x: 0, y: 645, w: 180, h: 75 },      // 하단 좌측 벽
-{ x: 260, y: 645, w: 220, h: 75 },     // 하단 우측 벽
-{ x: 95, y: 280, w: 95, h: 130 },     // 탁자
-{ x: 115, y: 430, w: 45, h: 60 },     // 의자
-{ x: 300, y: 230, w: 135, h: 210 }    // 침대
+{ x: 0, y: 0, w: 480, h: 260 },
+{ x: 0, y: 0, w: 65, h: 720 },
+{ x: 415, y: 0, w: 65, h: 720 },
+{ x: 0, y: 645, w: 180, h: 75 },
+{ x: 260, y: 645, w: 220, h: 75 },
+{ x: 95, y: 280, w: 95, h: 130 },
+{ x: 115, y: 430, w: 45, h: 60 },
+{ x: 300, y: 230, w: 135, h: 210 }
  ];
 }
 
@@ -494,7 +499,6 @@ isBagOpen = false;
 return;
 }
 
-// 좌측 인벤토리 슬롯 클릭 처리 (5개 슬롯)
 const invX = 10, invY = 85, invW = 65;
 if (clickX >= invX && clickX <= invX + invW) {
 const startY = invY + 8;
@@ -503,7 +507,6 @@ for (let i = 0; i < 5; i++) {
 const sy = startY + i * slotH;
 if (clickY >= sy && clickY <= sy + 46) {
 if (i === 4) {
-// 5번 슬롯(꾸러미) 클릭 시 확장 인벤토리 토글
 isBagOpen = !isBagOpen;
 return;
 }
@@ -520,7 +523,32 @@ return;
 }
 }
 
-// 밭 상호작용
+// FARM 맵 - 문 클릭 상호작용 (집 안으로 들어감)
+if (gameState === 'FARM') {
+if (clickX >= DOOR_POS.x && clickX <= DOOR_POS.x + DOOR_POS.w &&
+clickY >= DOOR_POS.y && clickY <= DOOR_POS.y + DOOR_POS.h + 30) {
+const doorFrontX = DOOR_POS.x + DOOR_POS.w / 2;
+const doorFrontY = DOOR_POS.y + DOOR_POS.h + 20;
+
+if (getDistance(player.x, player.y, doorFrontX, doorFrontY) <= INTERACTION_DIST) {
+startFade(() => {
+gameState = 'HOUSE';
+player.x = 220;
+player.y = 620;
+player.targetX = 220;
+player.targetY = 620;
+player.direction = 'north';
+});
+} else {
+updatePlayerDirection(doorFrontX, doorFrontY);
+player.targetX = doorFrontX;
+player.targetY = doorFrontY;
+}
+return;
+}
+}
+
+// FARM 맵 - 밭 상호작용
 if (gameState === 'FARM' &&
 clickX >= farmOffsetX && clickX <= farmOffsetX + FARM_COLS * tileW &&
 clickY >= farmOffsetY && clickY <= farmOffsetY + FARM_ROWS * tileH) {
@@ -532,7 +560,6 @@ if (col >= 0 && col < FARM_COLS && row >= 0 && row < FARM_ROWS) {
 const tileCenterX = farmOffsetX + col * tileW + tileW / 2;
 const tileCenterY = farmOffsetY + row * tileH + tileH / 2;
 
-// 1칸 거리(INTERACTION_DIST) 초과 시 해당 위치 근처로 우선 이동
 if (getDistance(player.x, player.y, tileCenterX, tileCenterY) > INTERACTION_DIST) {
 updatePlayerDirection(tileCenterX, tileCenterY);
 player.targetX = tileCenterX;
@@ -571,7 +598,6 @@ return;
 }
 
 if (gameState === 'HOUSE') {
-// 침대 상호작용
 if (clickX >= 300 && clickX <= 435 && clickY >= 230 && clickY <= 440) {
 if (getDistance(player.x, player.y, 370, 335) <= INTERACTION_DIST) {
 showSleepModal = true;
@@ -583,56 +609,20 @@ player.targetY = 335;
 return;
 }
 
-// 하단 보라색 문 구역 터치 시 집 밖으로 이동
 if (clickX >= 180 && clickX <= 260 && clickY >= 635 && clickY <= 710) {
 if (getDistance(player.x, player.y, 220, 640) <= INTERACTION_DIST) {
 startFade(() => {
 gameState = 'FARM';
-player.x = 335;
-player.y = 270;
-player.targetX = 335;
-player.targetY = 270;
+player.x = 375;
+player.y = 135;
+player.targetX = 375;
+player.targetY = 135;
 player.direction = 'south';
 });
 } else {
 updatePlayerDirection(220, 640);
 player.targetX = 220;
 player.targetY = 640;
-}
-return;
-}
-}
-else if (gameState === 'FARM') {
-// 집 입구 이동
-if (clickX >= 290 && clickX <= 380 && clickY >= 140 && clickY <= 250) {
-if (getDistance(player.x, player.y, 335, 230) <= INTERACTION_DIST) {
-startFade(() => {
-gameState = 'HOUSE';
-player.x = 220;
-player.y = 620;
-player.targetX = 220;
-player.targetY = 620;
-player.direction = 'north';
-});
-} else {
-updatePlayerDirection(335, 230);
-player.targetX = 335;
-player.targetY = 230;
-}
-return;
-}
-
-// 우체통 씨앗 수령
-if (clickX >= 200 && clickX <= 270 && clickY >= 140 && clickY <= 220) {
-if (getDistance(player.x, player.y, 235, 180) <= INTERACTION_DIST) {
-if (mailboxHasSeed) {
-mailboxHasSeed = false;
-addItemToInventory({ type: 'seed', id: 'potato_seed', name: '감자 씨앗', cropId: 'potato', count: 6 });
-}
-} else {
-updatePlayerDirection(235, 180);
-player.targetX = 235;
-player.targetY = 180;
 }
 return;
 }
@@ -735,8 +725,8 @@ function renderFarmMap() {
 const period = getTimePeriod(gameTime);
 drawBackgroundImage(`${period}_FARM`);
 
-if (mailboxHasSeed && uiImages.noticeIcon.complete && uiImages.noticeIcon.naturalWidth !== 0) {
-ctx.drawImage(uiImages.noticeIcon, 230, 125, 24, 24);
+if (doorImage.complete && doorImage.naturalWidth !== 0) {
+ctx.drawImage(doorImage, DOOR_POS.x, DOOR_POS.y, DOOR_POS.w, DOOR_POS.h);
 }
 
 for (let r = 0; r < FARM_ROWS; r++) {
@@ -912,7 +902,6 @@ ctx.fillText(item.count, invX + invW - 14, slotY + 41);
 }
 }
 } else if (i === 4) {
-// 5번 슬롯 꾸러미 아이콘 표시
 const iconX = invX + (invW - iconSize) / 2;
 const iconY = slotY + 7;
 if (itemImages.bag.complete && itemImages.bag.naturalWidth !== 0) {
