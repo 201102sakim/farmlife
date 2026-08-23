@@ -58,11 +58,26 @@ titleImage.src = 'title.png';
 const doorImage = new Image();
 doorImage.src = 'door.png';
 
+const postImage = new Image();
+postImage.src = 'post.png';
+
+const fullPostImage = new Image();
+fullPostImage.src = 'full_post.png';
+
+let hasMail = true;
+
 const DOOR_POS = {
 x: 335,
 y: 16,
 w: 82,
 h: 88
+};
+
+const POST_POS = {
+x: 272,
+y: 72,
+w: 42,
+h: 52
 };
 
 const charSprites = {
@@ -216,11 +231,11 @@ let obstacles = [];
 
 if (scene === 'FARM') {
 obstacles = [
-{ x: 0, y: 0, w: 260, h: 140 },
-{ x: 0, y: 140, w: 25, h: 540 },
+{ x: 0, y: 0, w: 260, h: 105 },
+{ x: 0, y: 105, w: 25, h: 575 },
 { x: 0, y: 680, w: 480, h: 40 },
 { x: 260, y: 0, w: 220, h: 105 },
-{ x: 210, y: 135, w: 50, h: 85 },
+{ x: 165, y: 105, w: 90, h: 30 },
 { x: 460, y: 220, w: 20, h: 200 }
  ];
 } else if (scene === 'HOUSE') {
@@ -414,7 +429,7 @@ pendingSceneChange = callback;
 function addItemToInventory(item) {
 for (let i = 2; i < 4; i++) {
 if (!hotbar[i]) {
-hotbar[i] = item;
+hotbar[i] = { ...item };
 return true;
 } else if (hotbar[i].id === item.id) {
 hotbar[i].count += item.count;
@@ -423,7 +438,7 @@ return true;
 }
 for (let i = 0; i < bagInventory.length; i++) {
 if (!bagInventory[i]) {
-bagInventory[i] = item;
+bagInventory[i] = { ...item };
 return true;
 } else if (bagInventory[i].id === item.id) {
 bagInventory[i].count += item.count;
@@ -523,8 +538,36 @@ return;
 }
 }
 
-// FARM 맵 - 문 클릭 상호작용 (집 안으로 들어감)
 if (gameState === 'FARM') {
+// 우편함 클릭 상호작용
+if (clickX >= POST_POS.x - 10 && clickX <= POST_POS.x + POST_POS.w + 10 &&
+clickY >= POST_POS.y - 10 && clickY <= POST_POS.y + POST_POS.h + 20) {
+
+const postFrontX = POST_POS.x + POST_POS.w / 2;
+const postFrontY = POST_POS.y + POST_POS.h + 25;
+
+if (getDistance(player.x, player.y, postFrontX, postFrontY) <= INTERACTION_DIST) {
+if (hasMail) {
+const seedItem = { type: 'seed', id: 'potato_seed', cropId: 'potato', name: '감자 씨앗', count: 6 };
+const success = addItemToInventory(seedItem);
+if (success) {
+hasMail = false;
+showItemNotice('감자 씨앗 6개를 얻었습니다!');
+} else {
+showItemNotice('인벤토리가 가득 찼습니다.');
+}
+} else {
+showItemNotice('우편함이 비어있습니다.');
+}
+} else {
+updatePlayerDirection(postFrontX, postFrontY);
+player.targetX = postFrontX;
+player.targetY = postFrontY;
+}
+return;
+}
+
+// 문 클릭 상호작용
 if (clickX >= DOOR_POS.x && clickX <= DOOR_POS.x + DOOR_POS.w &&
 clickY >= DOOR_POS.y && clickY <= DOOR_POS.y + DOOR_POS.h + 30) {
 const doorFrontX = DOOR_POS.x + DOOR_POS.w / 2;
@@ -727,6 +770,11 @@ drawBackgroundImage(`${period}_FARM`);
 
 if (doorImage.complete && doorImage.naturalWidth !== 0) {
 ctx.drawImage(doorImage, DOOR_POS.x, DOOR_POS.y, DOOR_POS.w, DOOR_POS.h);
+}
+
+const currentPostImg = hasMail ? fullPostImage : postImage;
+if (currentPostImg.complete && currentPostImg.naturalWidth !== 0) {
+ctx.drawImage(currentPostImg, POST_POS.x, POST_POS.y, POST_POS.w, POST_POS.h);
 }
 
 for (let r = 0; r < FARM_ROWS; r++) {
