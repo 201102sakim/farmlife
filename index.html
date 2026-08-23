@@ -22,8 +22,9 @@ body {
 }
 #game-container {
   position: relative;
-  width: 480px;
-  height: 720px;
+  height: 88vh;
+  width: calc(88vh * (2 / 3));
+  max-width: 95vw;
   box-shadow: 0 0 25px rgba(0,0,0,0.9);
   border: 6px solid #2d1810;
   background: #83b869;
@@ -754,7 +755,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const active = charSprites[activeKey];
 
     if (active && active.loaded) {
-      // 캐릭터 세로 크기를 기존 72에서 110으로 확대
       const RENDER_HEIGHT = 110;
       const renderWidth = (active.frameW / active.frameH) * RENDER_HEIGHT;
 
