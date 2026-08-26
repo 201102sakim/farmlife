@@ -57,35 +57,49 @@ if (!ctx) return;
 
 ctx.imageSmoothingEnabled = false;
 
-// --- 이미지 로딩 헬퍼 ---
-function isLoaded(img) {
-    return img && img.complete && img.naturalWidth !== 0;
-}
+const titleImage = new Image();
+titleImage.src = 'title.png';
 
-function drawImg(image, x, y, w, h) {
-    if (isLoaded(image)) {
-        if (w !== undefined && h !== undefined) {
-            ctx.drawImage(image, x, y, w, h);
-        } else {
-            ctx.drawImage(image, x, y);
-        }
-        return true;
-    }
-    return false;
-}
+const doorImage = new Image();
+doorImage.src = 'door.png';
 
-const titleImage = new Image(); titleImage.src = 'title.png';
-const doorImage = new Image(); doorImage.src = 'door.png';
-const postImage = new Image(); postImage.src = 'post.png';
-const fullPostImage = new Image(); fullPostImage.src = 'full_post.png';
-const chooseMapImage = new Image(); chooseMapImage.src = 'choose_map.png';
-const closeImage = new Image(); closeImage.src = 'close.png';
+const houseDoorImage = new Image();
+houseDoorImage.src = 'house_door.png';
+
+const postImage = new Image();
+postImage.src = 'post.png';
+
+const fullPostImage = new Image();
+fullPostImage.src = 'full_post.png';
+
+const chooseMapImage = new Image();
+chooseMapImage.src = 'choose_map.png';
+
+const cancelImage = new Image();
+cancelImage.src = 'cancel.png';
 
 let hasMail = true;
 
-const DOOR_POS = { x: 335, y: 16, w: 82, h: 88 };
-const HOUSE_DOOR_POS = { x: 185, y: 625, w: 75, h: 85 };
-const POST_POS = { x: 252, y: 135, w: 52, h: 55 };
+const DOOR_POS = {
+    x: 335,
+    y: 16,
+    w: 82,
+    h: 88
+};
+
+const HOUSE_DOOR_POS = {
+    x: 153,
+    y: 630,
+    w: 58,
+    h: 68
+};
+
+const POST_POS = {
+    x: 252,
+    y: 135,
+    w: 52,
+    h: 55
+};
 
 const charSprites = {
     south: { img: new Image(), src: 'south_walk.png', loaded: false, cols: 7, rows: 2, walkFrames: [0, 2, 4, 6], offsets: [0, 2, 0, 2] },
@@ -102,13 +116,10 @@ function loadCharSprite(key) {
     };
     s.img.src = s.src;
 }
+
 loadCharSprite('south');
 loadCharSprite('north');
 loadCharSprite('east');
-
-function getSpriteKey(dir) {
-    return dir === 'west' ? 'east' : dir;
-}
 
 const uiImages = {
     dateTime: new Image(),
@@ -135,18 +146,35 @@ itemImages.potato.src = 'item_potato.png';
 itemImages.bag.src = 'item_bag.png';
 
 const cropImages = {
-    potato: [new Image(), new Image(), new Image()]
+    potato: [
+        new Image(),
+        new Image(),
+        new Image()
+    ]
 };
 cropImages.potato[0].src = 'crop_potato_stage1.png';
 cropImages.potato[1].src = 'crop_potato_stage2.png';
 cropImages.potato[2].src = 'crop_potato_stage3.png';
 
 const bgImages = {
-    MORNING_HOUSE: new Image(), MORNING_FARM: new Image(),
-    EVENING_HOUSE: new Image(), EVENING_FARM: new Image(),
-    NIGHT_HOUSE: new Image(), NIGHT_FARM: new Image(),
-    DAWN_HOUSE: new Image(), DAWN_FARM: new Image()
+    MORNING_HOUSE: new Image(),
+    MORNING_FARM: new Image(),
+    EVENING_HOUSE: new Image(),
+    EVENING_FARM: new Image(),
+    NIGHT_HOUSE: new Image(),
+    NIGHT_FARM: new Image(),
+    DAWN_HOUSE: new Image(),
+    DAWN_FARM: new Image(),
+    MORNING_PIER: new Image(),
+    EVENING_PIER: new Image(),
+    NIGHT_PIER: new Image(),
+    DAWN_PIER: new Image(),
+    MORNING_MARKET: new Image(),
+    EVENING_MARKET: new Image(),
+    NIGHT_MARKET: new Image(),
+    DAWN_MARKET: new Image()
 };
+
 bgImages.MORNING_HOUSE.src = 'house_morning.png';
 bgImages.MORNING_FARM.src = 'farm_morning.png';
 bgImages.EVENING_HOUSE.src = 'house_evening.png';
@@ -155,6 +183,16 @@ bgImages.NIGHT_HOUSE.src = 'house_night.png';
 bgImages.NIGHT_FARM.src = 'farm_night.png';
 bgImages.DAWN_HOUSE.src = 'house_dawn.png';
 bgImages.DAWN_FARM.src = 'farm_dawn.png';
+
+bgImages.MORNING_PIER.src = 'pier_morning.png';
+bgImages.EVENING_PIER.src = 'pier_evening.png';
+bgImages.NIGHT_PIER.src = 'pier_night.png';
+bgImages.DAWN_PIER.src = 'pier_dawn.png';
+
+bgImages.MORNING_MARKET.src = 'market_morning.png';
+bgImages.EVENING_MARKET.src = 'market_evening.png';
+bgImages.NIGHT_MARKET.src = 'market_night.png';
+bgImages.DAWN_MARKET.src = 'market_dawn.png';
 
 let gameState = 'TITLE';
 let fadeAlpha = 0;
@@ -173,6 +211,9 @@ let isBagOpen = false;
 
 let selectedItemNotice = '';
 let selectedItemNoticeTimer = 0;
+
+let mapNotice = '';
+let mapNoticeTimer = 0;
 
 const INTERACTION_DIST = 55;
 
@@ -220,10 +261,6 @@ const titleButtons = [
     { id: 'exit', x: 130, y: 500, w: 180, h: 65 }
 ];
 
-function getDistance(x1, y1, x2, y2) {
-    return Math.hypot(x2 - x1, y2 - y1);
-}
-
 function checkCollision(x, y, scene) {
     const pRadius = 12;
     const pBox = {
@@ -248,11 +285,18 @@ function checkCollision(x, y, scene) {
             { x: 0, y: 0, w: 480, h: 260 },
             { x: 0, y: 0, w: 65, h: 720 },
             { x: 415, y: 0, w: 65, h: 720 },
-            { x: 0, y: 645, w: 180, h: 75 },
-            { x: 260, y: 645, w: 220, h: 75 },
+            { x: 0, y: 645, w: 145, h: 75 },
+            { x: 215, y: 645, w: 265, h: 75 },
             { x: 95, y: 280, w: 95, h: 130 },
             { x: 115, y: 430, w: 45, h: 60 },
             { x: 300, y: 230, w: 135, h: 210 }
+        ];
+    } else if (scene === 'PIER' || scene === 'MARKET') {
+        obstacles = [
+            { x: 0, y: 0, w: 480, h: 50 },
+            { x: 0, y: 680, w: 480, h: 40 },
+            { x: 0, y: 0, w: 20, h: 720 },
+            { x: 460, y: 0, w: 20, h: 720 }
         ];
     }
 
@@ -335,6 +379,14 @@ function update(dt) {
         }
     }
 
+    if (mapNoticeTimer > 0) {
+        mapNoticeTimer -= dt;
+        if (mapNoticeTimer <= 0) {
+            mapNoticeTimer = 0;
+            mapNotice = '';
+        }
+    }
+
     if (gameState === 'TITLE' || showSleepModal || showChooseMapModal) return;
 
     if (!player.isSleeping) {
@@ -342,13 +394,13 @@ function update(dt) {
         let timeSpeed = 1;
 
         if (hour >= 6 && hour < 18) {
-            timeSpeed = 2.0;
+            timeSpeed = 720 / 360;
         } else if (hour >= 18 && hour < 21) {
-            timeSpeed = 1.0;
+            timeSpeed = 180 / 180;
         } else if (hour >= 21 || hour < 4) {
-            timeSpeed = 2.33;
+            timeSpeed = 420 / 180;
         } else {
-            timeSpeed = 0.67;
+            timeSpeed = 120 / 180;
         }
 
         gameTime += dt * timeSpeed;
@@ -360,7 +412,7 @@ function update(dt) {
 
     const dx = player.targetX - player.x;
     const dy = player.targetY - player.y;
-    const dist = getDistance(player.x, player.y, player.targetX, player.targetY);
+    const dist = Math.hypot(dx, dy);
 
     if (dist > 1.5) {
         player.isMoving = true;
@@ -371,31 +423,40 @@ function update(dt) {
         let canMoveX = !checkCollision(nextX, player.y, gameState);
         let canMoveY = !checkCollision(player.x, nextY, gameState);
 
+        const prevX = player.x;
+        const prevY = player.y;
+
         if (canMoveX) player.x = nextX;
         if (canMoveY) player.y = nextY;
 
-        if (!canMoveX && !canMoveY) {
+        if ((!canMoveX && !canMoveY) || (player.x === prevX && player.y === prevY)) {
             player.targetX = player.x;
             player.targetY = player.y;
             player.isMoving = false;
+            player.frameIndex = 0;
+            player.frameTimer = 0;
         }
     } else {
         player.x = player.targetX;
         player.y = player.targetY;
         player.isMoving = false;
+        player.frameIndex = 0;
+        player.frameTimer = 0;
     }
 
-    if (gameState === 'FARM' && player.x >= 445 && player.y >= 320 && player.y <= 480) {
+    if (gameState === 'FARM' && player.x >= 445 && player.y >= 310 && player.y <= 430) {
         showChooseMapModal = true;
         player.targetX = player.x;
         player.targetY = player.y;
         player.isMoving = false;
+        player.frameIndex = 0;
+        player.frameTimer = 0;
     }
 
     if (player.isMoving) {
         player.frameTimer++;
         if (player.frameTimer % 8 === 0) {
-            const activeKey = getSpriteKey(player.direction);
+            const activeKey = (player.direction === 'west') ? 'east' : player.direction;
             const active = charSprites[activeKey];
             if (active && active.walkFrames) {
                 player.frameIndex = (player.frameIndex + 1) % active.walkFrames.length;
@@ -424,10 +485,10 @@ function nextDay() {
         });
 
         gameState = 'HOUSE';
-        player.x = 240;
-        player.y = 380;
-        player.targetX = 240;
-        player.targetY = 380;
+        player.x = 180;
+        player.y = 580;
+        player.targetX = 180;
+        player.targetY = 580;
         player.direction = 'south';
         player.isSleeping = false;
     });
@@ -438,33 +499,22 @@ function startFade(callback) {
     pendingSceneChange = callback;
 }
 
-// 개선된 아이템 추가 로직 (기존 스택 우선 합산)
 function addItemToInventory(item) {
-    // 1. 핫바에 기존 스택이 존재하는지 확인
-    for (let i = 2; i < 4; i++) {
-        if (hotbar[i] && hotbar[i].id === item.id) {
-            hotbar[i].count += item.count;
-            return true;
-        }
-    }
-    // 2. 가방에 기존 스택이 존재하는지 확인
-    for (let i = 0; i < bagInventory.length; i++) {
-        if (bagInventory[i] && bagInventory[i].id === item.id) {
-            bagInventory[i].count += item.count;
-            return true;
-        }
-    }
-    // 3. 핫바의 빈 슬롯 확인
     for (let i = 2; i < 4; i++) {
         if (!hotbar[i]) {
             hotbar[i] = { ...item };
             return true;
+        } else if (hotbar[i].id === item.id) {
+            hotbar[i].count += item.count;
+            return true;
         }
     }
-    // 4. 가방의 빈 슬롯 확인
     for (let i = 0; i < bagInventory.length; i++) {
         if (!bagInventory[i]) {
             bagInventory[i] = { ...item };
+            return true;
+        } else if (bagInventory[i].id === item.id) {
+            bagInventory[i].count += item.count;
             return true;
         }
     }
@@ -474,6 +524,15 @@ function addItemToInventory(item) {
 function showItemNotice(name) {
     selectedItemNotice = name;
     selectedItemNoticeTimer = 2.5;
+}
+
+function showMapNotice(msg) {
+    mapNotice = msg;
+    mapNoticeTimer = 2.5;
+}
+
+function getDistance(x1, y1, x2, y2) {
+    return Math.hypot(x2 - x1, y2 - y1);
 }
 
 window.addEventListener('keydown', (e) => {
@@ -496,15 +555,66 @@ canvas.addEventListener('pointerdown', (e) => {
     if (fadeState !== 'NONE') return;
 
     if (showChooseMapModal) {
-        const uiW = 360, uiH = 360;
+        const uiW = 360;
+        const uiH = 360;
         const uiX = (canvas.width - uiW) / 2;
         const uiY = (canvas.height - uiH) / 2;
-        const closeX = uiX + 10, closeY = uiY + 10, closeSize = 36;
 
-        if (clickX >= closeX && clickX <= closeX + closeSize && clickY >= closeY && clickY <= closeY + closeSize) {
+        const cancelX = uiX + 8;
+        const cancelY = uiY + 8;
+        const cancelSize = 40;
+
+        if (clickX >= cancelX && clickX <= cancelX + cancelSize && clickY >= cancelY && clickY <= cancelY + cancelSize) {
             showChooseMapModal = false;
             player.x = 420;
             player.targetX = 420;
+            return;
+        }
+
+        const halfW = uiW / 2;
+        const halfH = uiH / 2;
+
+        if (clickX >= uiX && clickX < uiX + halfW && clickY >= uiY && clickY < uiY + halfH) {
+            if (gameState === 'FARM') {
+                showMapNotice('현재 농장에 위치합니다.');
+            } else {
+                showChooseMapModal = false;
+                startFade(() => {
+                    gameState = 'FARM';
+                    player.x = 240;
+                    player.y = 360;
+                    player.targetX = 240;
+                    player.targetY = 360;
+                });
+            }
+        } else if (clickX >= uiX + halfW && clickX <= uiX + uiW && clickY >= uiY && clickY < uiY + halfH) {
+            if (gameState === 'PIER') {
+                showMapNotice('현재 부둣가에 위치합니다.');
+            } else {
+                showChooseMapModal = false;
+                startFade(() => {
+                    gameState = 'PIER';
+                    player.x = 240;
+                    player.y = 360;
+                    player.targetX = 240;
+                    player.targetY = 360;
+                });
+            }
+        } else if (clickX >= uiX && clickX < uiX + halfW && clickY >= uiY + halfH && clickY <= uiY + uiH) {
+            showMapNotice('아직 구현되지 않은 맵입니다.');
+        } else if (clickX >= uiX + halfW && clickX <= uiX + uiW && clickY >= uiY + halfH && clickY <= uiY + uiH) {
+            if (gameState === 'MARKET') {
+                showMapNotice('현재 마켓에 위치합니다.');
+            } else {
+                showChooseMapModal = false;
+                startFade(() => {
+                    gameState = 'MARKET';
+                    player.x = 240;
+                    player.y = 360;
+                    player.targetX = 240;
+                    player.targetY = 360;
+                });
+            }
         }
         return;
     }
@@ -525,14 +635,13 @@ canvas.addEventListener('pointerdown', (e) => {
                 if (btn.id === 'start') {
                     startFade(() => {
                         gameState = 'HOUSE';
-                        player.x = 240;
-                        player.y = 480;
-                        player.targetX = 240;
-                        player.targetY = 480;
+                        player.x = 180;
+                        player.y = 520;
+                        player.targetX = 180;
+                        player.targetY = 520;
                         player.direction = 'north';
                     });
                 } else if (btn.id === 'option') {
-                    showItemNotice('옵션 메뉴 준비 중');
                 } else if (btn.id === 'exit') {
                     alert('게임을 종료합니다.');
                 }
@@ -543,28 +652,6 @@ canvas.addEventListener('pointerdown', (e) => {
 
     if (isBagOpen) {
         const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
-        const gridStartX = bagX + 22;
-        const gridStartY = bagY + 22;
-        const cellW = 56;
-        const cellH = 52;
-
-        // 가방 안의 아이템을 클릭했을 때 핫바와 교체
-        if (clickX >= gridStartX && clickX <= gridStartX + 6 * cellW &&
-            clickY >= gridStartY && clickY <= gridStartY + 5 * cellH) {
-            const c = Math.floor((clickX - gridStartX) / cellW);
-            const r = Math.floor((clickY - gridStartY) / cellH);
-            const idx = r * 6 + c;
-
-            if (idx >= 0 && idx < bagInventory.length && bagInventory[idx]) {
-                const targetSlot = (selectedHotbarSlot >= 2 && selectedHotbarSlot < 4) ? selectedHotbarSlot : 2;
-                const temp = hotbar[targetSlot];
-                hotbar[targetSlot] = bagInventory[idx];
-                bagInventory[idx] = temp;
-                showItemNotice(`${hotbar[targetSlot].name} 장착됨`);
-                return;
-            }
-        }
-
         if (clickX < bagX || clickX > bagX + bagW || clickY < bagY || clickY > bagY + bagH) {
             isBagOpen = false;
         }
@@ -631,10 +718,10 @@ canvas.addEventListener('pointerdown', (e) => {
             if (getDistance(player.x, player.y, doorFrontX, doorFrontY) <= INTERACTION_DIST) {
                 startFade(() => {
                     gameState = 'HOUSE';
-                    player.x = 220;
-                    player.y = 610;
-                    player.targetX = 220;
-                    player.targetY = 610;
+                    player.x = 180;
+                    player.y = 580;
+                    player.targetX = 180;
+                    player.targetY = 580;
                     player.direction = 'north';
                 });
             } else {
@@ -682,17 +769,12 @@ canvas.addEventListener('pointerdown', (e) => {
                     if (activeItem.count <= 0) hotbar[selectedHotbarSlot] = null;
                 }
             } else if (selectedHotbarSlot === -1) {
-                // 수확 시 인벤토리가 가득 찼을 때 작물이 사라지지 않도록 보호
                 if (tile.crop && tile.crop.progressDays >= tile.crop.growthDays) {
-                    const cropInfo = CROP_DATA[tile.crop.id];
-                    const yieldCount = Math.floor(Math.random() * (cropInfo.maxYield - cropInfo.minYield + 1)) + cropInfo.minYield;
-                    const success = addItemToInventory({ type: 'crop', id: tile.crop.id, name: cropInfo.name, count: yieldCount });
-                    if (success) {
-                        tile.crop = null;
-                        showItemNotice(`${cropInfo.name} ${yieldCount}개를 수확했습니다!`);
-                    } else {
-                        showItemNotice('인벤토리가 가득 차 수확할 수 없습니다.');
-                    }
+                    const min = CROP_DATA[tile.crop.id].minYield;
+                    const max = CROP_DATA[tile.crop.id].maxYield;
+                    const yieldCount = Math.floor(Math.random() * (max - min + 1)) + min;
+                    addItemToInventory({ type: 'crop', id: tile.crop.id, name: '감자', count: yieldCount });
+                    tile.crop = null;
                 }
             }
             return;
@@ -747,19 +829,28 @@ function render() {
     if (gameState === 'TITLE') renderTitleScreen();
     else if (gameState === 'HOUSE') { renderHouseMap(); renderPlayer(); renderUI(); }
     else if (gameState === 'FARM') { renderFarmMap(); renderPlayer(); renderUI(); }
+    else if (gameState === 'PIER') { renderPierMap(); renderPlayer(); renderUI(); }
+    else if (gameState === 'MARKET') { renderMarketMap(); renderPlayer(); renderUI(); }
 
     if (showChooseMapModal) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const uiW = 360, uiH = 360;
+        const uiW = 360;
+        const uiH = 360;
         const uiX = (canvas.width - uiW) / 2;
         const uiY = (canvas.height - uiH) / 2;
 
-        drawImg(chooseMapImage, uiX, uiY, uiW, uiH);
+        if (chooseMapImage.complete && chooseMapImage.naturalWidth !== 0) {
+            ctx.drawImage(chooseMapImage, uiX, uiY, uiW, uiH);
+        }
 
-        const closeX = uiX + 10, closeY = uiY + 10, closeSize = 36;
-        drawImg(closeImage, closeX, closeY, closeSize, closeSize);
+        const cancelX = uiX + 8;
+        const cancelY = uiY + 8;
+        const cancelSize = 40;
+        if (cancelImage.complete && cancelImage.naturalWidth !== 0) {
+            ctx.drawImage(cancelImage, cancelX, cancelY, cancelSize, cancelSize);
+        }
     }
 
     if (showSleepModal) {
@@ -794,6 +885,34 @@ function render() {
         ctx.fillText('아니오', 305, 393);
     }
 
+    if (mapNoticeTimer > 0 && mapNotice) {
+        let alpha = 1.0;
+        if (mapNoticeTimer < 0.5) {
+            alpha = mapNoticeTimer / 0.5;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+        ctx.font = 'bold 16px MemomentKkukkukk';
+        ctx.textAlign = 'center';
+
+        const textMetrics = ctx.measureText(mapNotice);
+        const bgWidth = textMetrics.width + 24;
+        const bgHeight = 36;
+        const textX = canvas.width / 2;
+        const textY = canvas.height - 50;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(textX - bgWidth / 2, textY - 24, bgWidth, bgHeight);
+        ctx.strokeStyle = '#c78d53';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(textX - bgWidth / 2, textY - 24, bgWidth, bgHeight);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(mapNotice, textX, textY);
+        ctx.restore();
+    }
+
     if (fadeAlpha > 0) {
         ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -801,7 +920,9 @@ function render() {
 }
 
 function renderTitleScreen() {
-    if (!drawImg(titleImage, 0, 0, canvas.width, canvas.height)) {
+    if (titleImage.complete && titleImage.naturalWidth !== 0) {
+        ctx.drawImage(titleImage, 0, 0, canvas.width, canvas.height);
+    } else {
         ctx.fillStyle = '#1e272e';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ffffff';
@@ -826,7 +947,10 @@ function applyTimeOverlay() {
 }
 
 function drawBackgroundImage(imgKey) {
-    if (!drawImg(bgImages[imgKey], 0, 0, canvas.width, canvas.height)) {
+    const img = bgImages[imgKey];
+    if (img && img.complete && img.naturalWidth !== 0) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } else {
         ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
@@ -835,17 +959,26 @@ function drawBackgroundImage(imgKey) {
 function renderHouseMap() {
     const period = getTimePeriod(gameTime);
     drawBackgroundImage(`${period}_HOUSE`);
-    drawImg(doorImage, HOUSE_DOOR_POS.x, HOUSE_DOOR_POS.y, HOUSE_DOOR_POS.w, HOUSE_DOOR_POS.h);
+
+    if (houseDoorImage.complete && houseDoorImage.naturalWidth !== 0) {
+        ctx.drawImage(houseDoorImage, HOUSE_DOOR_POS.x, HOUSE_DOOR_POS.y, HOUSE_DOOR_POS.w, HOUSE_DOOR_POS.h);
+    }
+
     applyTimeOverlay();
 }
 
 function renderFarmMap() {
     const period = getTimePeriod(gameTime);
     drawBackgroundImage(`${period}_FARM`);
-    drawImg(doorImage, DOOR_POS.x, DOOR_POS.y, DOOR_POS.w, DOOR_POS.h);
+
+    if (doorImage.complete && doorImage.naturalWidth !== 0) {
+        ctx.drawImage(doorImage, DOOR_POS.x, DOOR_POS.y, DOOR_POS.w, DOOR_POS.h);
+    }
 
     const currentPostImg = hasMail ? fullPostImage : postImage;
-    drawImg(currentPostImg, POST_POS.x, POST_POS.y, POST_POS.w, POST_POS.h);
+    if (currentPostImg.complete && currentPostImg.naturalWidth !== 0) {
+        ctx.drawImage(currentPostImg, POST_POS.x, POST_POS.y, POST_POS.w, POST_POS.h);
+    }
 
     for (let r = 0; r < FARM_ROWS; r++) {
         for (let c = 0; c < FARM_COLS; c++) {
@@ -866,11 +999,20 @@ function renderFarmMap() {
 
             if (tile.crop) {
                 let stageIdx = 0;
-                if (tile.crop.progressDays >= tile.crop.growthDays) stageIdx = 2;
-                else if (tile.crop.progressDays > 0) stageIdx = 1;
+                if (tile.crop.progressDays >= tile.crop.growthDays) {
+                    stageIdx = 2;
+                } else if (tile.crop.progressDays > 0) {
+                    stageIdx = 1;
+                } else {
+                    stageIdx = 0;
+                }
 
-                const cropImg = cropImages[tile.crop.id][stageIdx];
-                drawImg(cropImg, tx + (tileW - 32) / 2, ty + (tileH - 32) / 2, 32, 32);
+                const img = cropImages[tile.crop.id][stageIdx];
+                if (img && img.complete && img.naturalWidth !== 0) {
+                    const cropX = tx + (tileW - 32) / 2;
+                    const cropY = ty + (tileH - 32) / 2;
+                    ctx.drawImage(img, cropX, cropY, 32, 32);
+                }
             }
         }
     }
@@ -878,8 +1020,20 @@ function renderFarmMap() {
     applyTimeOverlay();
 }
 
+function renderPierMap() {
+    const period = getTimePeriod(gameTime);
+    drawBackgroundImage(`${period}_PIER`);
+    applyTimeOverlay();
+}
+
+function renderMarketMap() {
+    const period = getTimePeriod(gameTime);
+    drawBackgroundImage(`${period}_MARKET`);
+    applyTimeOverlay();
+}
+
 function renderPlayer() {
-    const activeKey = getSpriteKey(player.direction);
+    const activeKey = (player.direction === 'west') ? 'east' : player.direction;
     const active = charSprites[activeKey];
 
     if (active && active.loaded) {
@@ -898,9 +1052,17 @@ function renderPlayer() {
         if (player.direction === 'west') {
             ctx.translate(drawX + renderWidth, drawY);
             ctx.scale(-1, 1);
-            ctx.drawImage(active.img, sx, sy, active.frameW, active.frameH, 0, 0, renderWidth, RENDER_HEIGHT);
+            ctx.drawImage(
+                active.img,
+                sx, sy, active.frameW, active.frameH,
+                0, 0, renderWidth, RENDER_HEIGHT
+            );
         } else {
-            ctx.drawImage(active.img, sx, sy, active.frameW, active.frameH, drawX, drawY, renderWidth, RENDER_HEIGHT);
+            ctx.drawImage(
+                active.img,
+                sx, sy, active.frameW, active.frameH,
+                drawX, drawY, renderWidth, RENDER_HEIGHT
+            );
         }
         ctx.restore();
     } else {
@@ -939,20 +1101,26 @@ function renderPlayer() {
 
 function renderItemIcon(item, x, y, size) {
     if (!item) return;
-    drawImg(itemImages[item.id], x, y, size, size);
+    const img = itemImages[item.id];
+    if (img && img.complete && img.naturalWidth !== 0) {
+        ctx.drawImage(img, x, y, size, size);
+    }
 }
 
 function renderUI() {
     const seasonX = 10, seasonY = 10, seasonSize = 65;
-    drawImg(uiImages.season, seasonX, seasonY, seasonSize, seasonSize);
-
+    if (uiImages.season.complete && uiImages.season.naturalWidth !== 0) {
+        ctx.drawImage(uiImages.season, seasonX, seasonY, seasonSize, seasonSize);
+    }
     ctx.fillStyle = '#5c311e';
     ctx.font = 'bold 18px MemomentKkukkukk';
     ctx.textAlign = 'center';
     ctx.fillText(SEASONS[currentSeasonIdx], seasonX + seasonSize / 2, seasonY + seasonSize / 2 + 6);
 
     const dtX = 80, dtY = 10, dtW = 140, dtH = 65;
-    drawImg(uiImages.dateTime, dtX, dtY, dtW, dtH);
+    if (uiImages.dateTime.complete && uiImages.dateTime.naturalWidth !== 0) {
+        ctx.drawImage(uiImages.dateTime, dtX, dtY, dtW, dtH);
+    }
 
     ctx.fillStyle = '#a83232';
     ctx.font = 'bold 12px MemomentKkukkukk';
@@ -965,7 +1133,9 @@ function renderUI() {
     ctx.fillText(formatGameTime(gameTime), dtX + 70, dtY + 48);
 
     const invX = 10, invY = 85, invW = 65, invH = 260;
-    drawImg(uiImages.inventory, invX, invY, invW, invH);
+    if (uiImages.inventory.complete && uiImages.inventory.naturalWidth !== 0) {
+        ctx.drawImage(uiImages.inventory, invX, invY, invW, invH);
+    }
 
     const startY = invY + 8;
     const slotH = 51;
@@ -997,14 +1167,18 @@ function renderUI() {
         } else if (i === 4) {
             const iconX = invX + (invW - iconSize) / 2;
             const iconY = slotY + 7;
-            drawImg(itemImages.bag, iconX, iconY, iconSize, iconSize);
+            if (itemImages.bag.complete && itemImages.bag.naturalWidth !== 0) {
+                ctx.drawImage(itemImages.bag, iconX, iconY, iconSize, iconSize);
+            }
         }
     }
 
     if (isBagOpen) {
         const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
 
-        if (!drawImg(uiImages.bagGrid, bagX, bagY, bagW, bagH)) {
+        if (uiImages.bagGrid.complete && uiImages.bagGrid.naturalWidth !== 0) {
+            ctx.drawImage(uiImages.bagGrid, bagX, bagY, bagW, bagH);
+        } else {
             ctx.fillStyle = 'rgba(20, 12, 8, 0.95)';
             ctx.fillRect(bagX, bagY, bagW, bagH);
         }
