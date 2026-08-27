@@ -24,6 +24,7 @@ body {
     min-height: 100vh;
     font-family: 'MemomentKkukkukk', sans-serif;
     overflow: hidden;
+    -webkit-font-smoothing: none;
 }
 #game-container {
     position: relative;
@@ -45,7 +46,7 @@ canvas {
 <body>
 
 <div id="game-container">
-    <canvas id="gameCanvas" width="480" height="720"></canvas>
+    <canvas id="gameCanvas" width="960" height="1440"></canvas>
 </div>
 
 <script>
@@ -54,8 +55,6 @@ const canvas = document.getElementById('gameCanvas');
 if (!canvas) return;
 const ctx = canvas.getContext('2d');
 if (!ctx) return;
-
-ctx.imageSmoothingEnabled = false;
 
 const titleImage = new Image();
 titleImage.src = 'title.png';
@@ -88,10 +87,10 @@ const DOOR_POS = {
 };
 
 const HOUSE_DOOR_POS = {
-    x: 153,
-    y: 630,
-    w: 58,
-    h: 68
+    x: 136,
+    y: 605,
+    w: 62,
+    h: 72
 };
 
 const POST_POS = {
@@ -184,15 +183,15 @@ bgImages.NIGHT_FARM.src = 'farm_night.png';
 bgImages.DAWN_HOUSE.src = 'house_dawn.png';
 bgImages.DAWN_FARM.src = 'farm_dawn.png';
 
-bgImages.MORNING_PIER.src = 'pier_morning.png';
-bgImages.EVENING_PIER.src = 'pier_evening.png';
-bgImages.NIGHT_PIER.src = 'pier_night.png';
-bgImages.DAWN_PIER.src = 'pier_dawn.png';
+bgImages.MORNING_PIER.src = 'sea_morning.png';
+bgImages.EVENING_PIER.src = 'sea_evening.png';
+bgImages.NIGHT_PIER.src = 'sea_night.png';
+bgImages.DAWN_PIER.src = 'sea_dawn.png';
 
-bgImages.MORNING_MARKET.src = 'market_morning.png';
-bgImages.EVENING_MARKET.src = 'market_evening.png';
-bgImages.NIGHT_MARKET.src = 'market_night.png';
-bgImages.DAWN_MARKET.src = 'market_dawn.png';
+bgImages.MORNING_MARKET.src = 'shop_morning.png';
+bgImages.EVENING_MARKET.src = 'shop_evening.png';
+bgImages.NIGHT_MARKET.src = 'shop_night.png';
+bgImages.DAWN_MARKET.src = 'shop_dawn.png';
 
 let gameState = 'TITLE';
 let fadeAlpha = 0;
@@ -285,13 +284,23 @@ function checkCollision(x, y, scene) {
             { x: 0, y: 0, w: 480, h: 260 },
             { x: 0, y: 0, w: 65, h: 720 },
             { x: 415, y: 0, w: 65, h: 720 },
-            { x: 0, y: 645, w: 145, h: 75 },
-            { x: 215, y: 645, w: 265, h: 75 },
+            { x: 0, y: 645, w: 130, h: 75 },
+            { x: 200, y: 645, w: 280, h: 75 },
             { x: 95, y: 280, w: 95, h: 130 },
             { x: 115, y: 430, w: 45, h: 60 },
             { x: 300, y: 230, w: 135, h: 210 }
         ];
-    } else if (scene === 'PIER' || scene === 'MARKET') {
+    } else if (scene === 'PIER') {
+        obstacles = [
+            { x: 0, y: 0, w: 480, h: 80 },        // 상단 바다
+            { x: 0, y: 80, w: 100, h: 640 },       // 좌측 암벽/바다
+            { x: 100, y: 80, w: 175, h: 170 },     // 오두막 집 및 주변 항아리/상자
+            { x: 0, y: 360, w: 260, h: 360 },      // 하단 좌측 바다 및 나룻배
+            { x: 370, y: 280, w: 110, h: 440 },    // 하단 우측 바다
+            { x: 260, y: 350, w: 15, h: 320 },     // 선착장 나무 다리 좌측 난간
+            { x: 365, y: 350, w: 15, h: 320 }      // 선착장 나무 다리 우측 난간
+        ];
+    } else if (scene === 'MARKET') {
         obstacles = [
             { x: 0, y: 0, w: 480, h: 50 },
             { x: 0, y: 680, w: 480, h: 40 },
@@ -338,6 +347,27 @@ function formatGameTime(timeInMinutes) {
     const displayHour = hours % 12 === 0 ? 12 : hours % 12;
     const displayMin = String(mins).padStart(2, '0');
     return `${displayHour}:${displayMin} ${period}`;
+}
+
+function drawCrispText(text, x, y, fontStr, fillStyle, strokeStyle = null, lineWidth = 2) {
+    ctx.save();
+    ctx.font = fontStr;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    const rx = Math.round(x);
+    const ry = Math.round(y);
+
+    if (strokeStyle) {
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth;
+        ctx.lineJoin = 'miter';
+        ctx.strokeText(text, rx, ry);
+    }
+    
+    ctx.fillStyle = fillStyle;
+    ctx.fillText(text, rx, ry);
+    ctx.restore();
 }
 
 let lastTime = performance.now();
@@ -453,6 +483,16 @@ function update(dt) {
         player.frameTimer = 0;
     }
 
+    // 부둣가 맵에서 빨간 부분 위치로 감지 영역 변경
+    if (gameState === 'PIER' && player.x >= 440 && player.y >= 150 && player.y <= 270) {
+        showChooseMapModal = true;
+        player.targetX = player.x;
+        player.targetY = player.y;
+        player.isMoving = false;
+        player.frameIndex = 0;
+        player.frameTimer = 0;
+    }
+
     if (player.isMoving) {
         player.frameTimer++;
         if (player.frameTimer % 8 === 0) {
@@ -485,10 +525,10 @@ function nextDay() {
         });
 
         gameState = 'HOUSE';
-        player.x = 180;
-        player.y = 580;
-        player.targetX = 180;
-        player.targetY = 580;
+        player.x = 168;
+        player.y = 560;
+        player.targetX = 168;
+        player.targetY = 560;
         player.direction = 'south';
         player.isSleeping = false;
     });
@@ -537,7 +577,7 @@ function getDistance(x1, y1, x2, y2) {
 
 window.addEventListener('keydown', (e) => {
     if (e.key === 'b' || e.key === 'B' || e.key === 'i' || e.key === 'I') {
-        if (gameState !== 'TITLE') {
+        if (gameState !== 'TITLE' && gameState !== 'MARKET') {
             isBagOpen = !isBagOpen;
         }
     } else if (e.key === 'Escape') {
@@ -549,25 +589,27 @@ window.addEventListener('keydown', (e) => {
 
 canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();
-    const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const clickX = ((e.clientX - rect.left) * (480 / rect.width));
+    const clickY = ((e.clientY - rect.top) * (720 / rect.height));
 
     if (fadeState !== 'NONE') return;
 
     if (showChooseMapModal) {
         const uiW = 360;
         const uiH = 360;
-        const uiX = (canvas.width - uiW) / 2;
-        const uiY = (canvas.height - uiH) / 2;
+        const uiX = (480 - uiW) / 2;
+        const uiY = (720 - uiH) / 2;
 
         const cancelX = uiX + 8;
         const cancelY = uiY + 8;
         const cancelSize = 40;
 
+        // X 버튼을 누를 시 순간이동 없이 현재 터치/원래 위치 유지
         if (clickX >= cancelX && clickX <= cancelX + cancelSize && clickY >= cancelY && clickY <= cancelY + cancelSize) {
             showChooseMapModal = false;
-            player.x = 420;
-            player.targetX = 420;
+            player.targetX = player.x;
+            player.targetY = player.y;
+            player.isMoving = false;
             return;
         }
 
@@ -594,10 +636,12 @@ canvas.addEventListener('pointerdown', (e) => {
                 showChooseMapModal = false;
                 startFade(() => {
                     gameState = 'PIER';
-                    player.x = 240;
-                    player.y = 360;
-                    player.targetX = 240;
-                    player.targetY = 360;
+                    // 부둣가 입장 시 스폰 위치를 보라색 원 좌표로 설정
+                    player.x = 400;
+                    player.y = 240;
+                    player.targetX = 400;
+                    player.targetY = 240;
+                    player.direction = 'south';
                 });
             }
         } else if (clickX >= uiX && clickX < uiX + halfW && clickY >= uiY + halfH && clickY <= uiY + uiH) {
@@ -635,9 +679,9 @@ canvas.addEventListener('pointerdown', (e) => {
                 if (btn.id === 'start') {
                     startFade(() => {
                         gameState = 'HOUSE';
-                        player.x = 180;
+                        player.x = 168;
                         player.y = 520;
-                        player.targetX = 180;
+                        player.targetX = 168;
                         player.targetY = 520;
                         player.direction = 'north';
                     });
@@ -649,6 +693,8 @@ canvas.addEventListener('pointerdown', (e) => {
         });
         return;
     }
+
+    if (gameState === 'MARKET') return;
 
     if (isBagOpen) {
         const bagX = 50, bagY = 160, bagW = 380, bagH = 320;
@@ -718,10 +764,10 @@ canvas.addEventListener('pointerdown', (e) => {
             if (getDistance(player.x, player.y, doorFrontX, doorFrontY) <= INTERACTION_DIST) {
                 startFade(() => {
                     gameState = 'HOUSE';
-                    player.x = 180;
-                    player.y = 580;
-                    player.targetX = 180;
-                    player.targetY = 580;
+                    player.x = 168;
+                    player.y = 560;
+                    player.targetX = 168;
+                    player.targetY = 560;
                     player.direction = 'north';
                 });
             } else {
@@ -796,9 +842,9 @@ canvas.addEventListener('pointerdown', (e) => {
         }
 
         if (clickX >= HOUSE_DOOR_POS.x && clickX <= HOUSE_DOOR_POS.x + HOUSE_DOOR_POS.w &&
-            clickY >= HOUSE_DOOR_POS.y && clickY <= HOUSE_DOOR_POS.y + HOUSE_DOOR_POS.h) {
+            clickY >= HOUSE_DOOR_POS.y && clickY <= HOUSE_DOOR_POS.y + HOUSE_DOOR_POS.h + 20) {
             const doorFrontX = HOUSE_DOOR_POS.x + HOUSE_DOOR_POS.w / 2;
-            const doorFrontY = HOUSE_DOOR_POS.y;
+            const doorFrontY = HOUSE_DOOR_POS.y - 10;
 
             if (getDistance(player.x, player.y, doorFrontX, doorFrontY) <= INTERACTION_DIST) {
                 startFade(() => {
@@ -824,22 +870,24 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.clearRect(0, 0, 480, 720);
+    ctx.imageSmoothingEnabled = false;
 
     if (gameState === 'TITLE') renderTitleScreen();
     else if (gameState === 'HOUSE') { renderHouseMap(); renderPlayer(); renderUI(); }
     else if (gameState === 'FARM') { renderFarmMap(); renderPlayer(); renderUI(); }
     else if (gameState === 'PIER') { renderPierMap(); renderPlayer(); renderUI(); }
-    else if (gameState === 'MARKET') { renderMarketMap(); renderPlayer(); renderUI(); }
+    else if (gameState === 'MARKET') { renderMarketMap(); renderUI(); }
 
     if (showChooseMapModal) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, 480, 720);
 
         const uiW = 360;
         const uiH = 360;
-        const uiX = (canvas.width - uiW) / 2;
-        const uiY = (canvas.height - uiH) / 2;
+        const uiX = (480 - uiW) / 2;
+        const uiY = (720 - uiH) / 2;
 
         if (chooseMapImage.complete && chooseMapImage.naturalWidth !== 0) {
             ctx.drawImage(chooseMapImage, uiX, uiY, uiW, uiH);
@@ -855,7 +903,7 @@ function render() {
 
     if (showSleepModal) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, 480, 720);
 
         ctx.fillStyle = '#2d1810';
         ctx.fillRect(110, 300, 260, 130);
@@ -863,26 +911,20 @@ function render() {
         ctx.lineWidth = 3;
         ctx.strokeRect(110, 300, 260, 130);
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 16px MemomentKkukkukk';
-        ctx.textAlign = 'center';
-        ctx.fillText('주무시겠습니까?', 240, 340);
+        drawCrispText('주무시겠습니까?', 240, 335, 'bold 18px MemomentKkukkukk', '#ffffff', '#100804', 3);
 
         ctx.fillStyle = '#4ae052';
         ctx.fillRect(140, 370, 70, 35);
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
         ctx.strokeRect(140, 370, 70, 35);
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 14px MemomentKkukkukk';
-        ctx.fillText('네', 175, 393);
+        drawCrispText('네', 175, 387, 'bold 16px MemomentKkukkukk', '#000000', null);
 
         ctx.fillStyle = '#e04a4a';
         ctx.fillRect(270, 370, 70, 35);
         ctx.strokeStyle = '#ffffff';
         ctx.strokeRect(270, 370, 70, 35);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('아니오', 305, 393);
+        drawCrispText('아니오', 305, 387, 'bold 16px MemomentKkukkukk', '#ffffff', '#000000', 2);
     }
 
     if (mapNoticeTimer > 0 && mapNotice) {
@@ -893,42 +935,37 @@ function render() {
 
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-        ctx.font = 'bold 16px MemomentKkukkukk';
-        ctx.textAlign = 'center';
 
+        ctx.font = 'bold 17px MemomentKkukkukk';
         const textMetrics = ctx.measureText(mapNotice);
-        const bgWidth = textMetrics.width + 24;
-        const bgHeight = 36;
-        const textX = canvas.width / 2;
-        const textY = canvas.height - 50;
+        const bgWidth = textMetrics.width + 28;
+        const bgHeight = 38;
+        const textX = 240;
+        const textY = 670;
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fillRect(textX - bgWidth / 2, textY - 24, bgWidth, bgHeight);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(textX - bgWidth / 2, textY - 19, bgWidth, bgHeight);
         ctx.strokeStyle = '#c78d53';
         ctx.lineWidth = 2;
-        ctx.strokeRect(textX - bgWidth / 2, textY - 24, bgWidth, bgHeight);
+        ctx.strokeRect(textX - bgWidth / 2, textY - 19, bgWidth, bgHeight);
 
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(mapNotice, textX, textY);
+        drawCrispText(mapNotice, textX, textY, 'bold 17px MemomentKkukkukk', '#ffffff', '#000000', 3);
         ctx.restore();
     }
 
     if (fadeAlpha > 0) {
         ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, 480, 720);
     }
 }
 
 function renderTitleScreen() {
     if (titleImage.complete && titleImage.naturalWidth !== 0) {
-        ctx.drawImage(titleImage, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(titleImage, 0, 0, 480, 720);
     } else {
         ctx.fillStyle = '#1e272e';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px MemomentKkukkukk';
-        ctx.textAlign = 'center';
-        ctx.fillText('타이틀 화면 로딩 중...', canvas.width / 2, canvas.height / 2);
+        ctx.fillRect(0, 0, 480, 720);
+        drawCrispText('타이틀 화면 로딩 중...', 240, 360, 'bold 22px MemomentKkukkukk', '#ffffff', '#000000', 3);
     }
 }
 
@@ -942,17 +979,17 @@ function applyTimeOverlay() {
         ctx.fillStyle = 'rgba(60, 30, 80, 0.45)';
     }
     if (period !== 'MORNING') {
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, 480, 720);
     }
 }
 
 function drawBackgroundImage(imgKey) {
     const img = bgImages[imgKey];
     if (img && img.complete && img.naturalWidth !== 0) {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, 480, 720);
     } else {
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, 480, 720);
     }
 }
 
@@ -1033,6 +1070,8 @@ function renderMarketMap() {
 }
 
 function renderPlayer() {
+    if (gameState === 'MARKET') return;
+
     const activeKey = (player.direction === 'west') ? 'east' : player.direction;
     const active = charSprites[activeKey];
 
@@ -1078,23 +1117,21 @@ function renderPlayer() {
 
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-        ctx.font = 'bold 12px MemomentKkukkukk';
-        ctx.textAlign = 'center';
 
+        ctx.font = 'bold 15px MemomentKkukkukk';
         const textMetrics = ctx.measureText(selectedItemNotice);
-        const bgWidth = textMetrics.width + 12;
-        const bgHeight = 18;
+        const bgWidth = textMetrics.width + 16;
+        const bgHeight = 22;
         const textX = player.x;
         const textY = player.y - 100;
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(textX - bgWidth / 2, textY - 13, bgWidth, bgHeight);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(textX - bgWidth / 2, textY - 11, bgWidth, bgHeight);
         ctx.strokeStyle = '#c78d53';
         ctx.lineWidth = 1;
-        ctx.strokeRect(textX - bgWidth / 2, textY - 13, bgWidth, bgHeight);
+        ctx.strokeRect(textX - bgWidth / 2, textY - 11, bgWidth, bgHeight);
 
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(selectedItemNotice, textX, textY);
+        drawCrispText(selectedItemNotice, textX, textY, 'bold 15px MemomentKkukkukk', '#ffffff', '#000000', 2);
         ctx.restore();
     }
 }
@@ -1112,25 +1149,17 @@ function renderUI() {
     if (uiImages.season.complete && uiImages.season.naturalWidth !== 0) {
         ctx.drawImage(uiImages.season, seasonX, seasonY, seasonSize, seasonSize);
     }
-    ctx.fillStyle = '#5c311e';
-    ctx.font = 'bold 18px MemomentKkukkukk';
-    ctx.textAlign = 'center';
-    ctx.fillText(SEASONS[currentSeasonIdx], seasonX + seasonSize / 2, seasonY + seasonSize / 2 + 6);
+    drawCrispText(SEASONS[currentSeasonIdx], seasonX + seasonSize / 2, seasonY + seasonSize / 2, 'bold 22px MemomentKkukkukk', '#2d1405', null);
 
     const dtX = 80, dtY = 10, dtW = 140, dtH = 65;
     if (uiImages.dateTime.complete && uiImages.dateTime.naturalWidth !== 0) {
         ctx.drawImage(uiImages.dateTime, dtX, dtY, dtW, dtH);
     }
 
-    ctx.fillStyle = '#a83232';
-    ctx.font = 'bold 12px MemomentKkukkukk';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${currentDay}일`, dtX + 70, dtY + 22);
+    drawCrispText(`${currentDay}일`, dtX + 70, dtY + 20, 'bold 16px MemomentKkukkukk', '#9e1b1b', null);
+    drawCrispText(formatGameTime(gameTime), dtX + 70, dtY + 44, 'bold 15px MemomentKkukkukk', '#111111', null);
 
-    ctx.fillStyle = '#3d2314';
-    ctx.font = 'bold 11px MemomentKkukkukk';
-    ctx.textAlign = 'center';
-    ctx.fillText(formatGameTime(gameTime), dtX + 70, dtY + 48);
+    if (gameState === 'MARKET') return;
 
     const invX = 10, invY = 85, invW = 65, invH = 260;
     if (uiImages.inventory.complete && uiImages.inventory.naturalWidth !== 0) {
@@ -1158,10 +1187,7 @@ function renderUI() {
                 renderItemIcon(item, iconX, iconY, iconSize);
 
                 if (item.count > 1) {
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 11px MemomentKkukkukk';
-                    ctx.textAlign = 'right';
-                    ctx.fillText(item.count, invX + invW - 14, slotY + 41);
+                    drawCrispText(String(item.count), invX + invW - 18, slotY + 36, 'bold 14px MemomentKkukkukk', '#ffffff', '#000000', 2);
                 }
             }
         } else if (i === 4) {
@@ -1198,10 +1224,7 @@ function renderUI() {
                     renderItemIcon(item, itemX, itemY, 32);
 
                     if (item.count > 1) {
-                        ctx.fillStyle = '#ffffff';
-                        ctx.font = 'bold 11px MemomentKkukkukk';
-                        ctx.textAlign = 'right';
-                        ctx.fillText(item.count, itemX + 34, itemY + 36);
+                        drawCrispText(String(item.count), itemX + 28, itemY + 28, 'bold 14px MemomentKkukkukk', '#ffffff', '#000000', 2);
                     }
                 }
             }
@@ -1209,7 +1232,9 @@ function renderUI() {
     }
 }
 
-gameLoop();
+document.fonts.ready.then(() => {
+    gameLoop();
+});
 });
 </script>
 </body>
